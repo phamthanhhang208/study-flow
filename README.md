@@ -2,7 +2,7 @@
 
 AI-powered learning companion that researches topics, organizes information, and creates structured study guides using the You.com API.
 
-Live Preview: study-flow-jgy7.vercel.app
+[Live Preview](https://study-flow-jgy7.vercel.app/)
 
 ## Features
 
