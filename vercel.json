@@ -1,0 +1,7 @@
+{
+  "rewrites": [
+    { "source": "/api/search/(.*)", "destination": "/api/search/$1" },
+    { "source": "/api/agent/(.*)", "destination": "/api/agent/$1" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
+}

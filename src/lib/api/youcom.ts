@@ -14,9 +14,9 @@ import {
 } from "./errors";
 import { detectVideo } from "../utils/video";
 
-const isDev = import.meta.env.DEV;
-const SEARCH_BASE = isDev ? "/api/search" : "https://ydc-index.io/v1";
-const AGENT_BASE = isDev ? "/api/agent" : "https://api.you.com/v1";
+// Always use /api/ paths — proxied by Vite dev server or Vercel serverless functions
+const SEARCH_BASE = "/api/search";
+const AGENT_BASE = "/api/agent";
 
 const DEFAULT_TIMEOUT = 30_000;
 const MAX_RETRIES = 3;
