@@ -1,7 +1,7 @@
 {
   "rewrites": [
-    { "source": "/api/search/(.*)", "destination": "/api/search/$1" },
-    { "source": "/api/agent/(.*)", "destination": "/api/agent/$1" },
+    { "source": "/api/search/:path*", "destination": "https://ydc-index.io/v1/:path*" },
+    { "source": "/api/agent/:path*", "destination": "https://api.you.com/v1/:path*" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }

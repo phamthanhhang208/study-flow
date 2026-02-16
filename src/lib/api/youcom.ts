@@ -14,7 +14,7 @@ import {
 } from "./errors";
 import { detectVideo } from "../utils/video";
 
-// Always use /api/ paths — proxied by Vite dev server or Vercel serverless functions
+// Proxied by Vite dev server (dev) or Vercel rewrites (prod)
 const SEARCH_BASE = "/api/search";
 const AGENT_BASE = "/api/agent";
 
