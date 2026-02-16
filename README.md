@@ -2,6 +2,8 @@
 
 AI-powered learning companion that researches topics, organizes information, and creates structured study guides using the You.com API.
 
+[Live Preview](https://study-flow-jgy7.vercel.app/)
+
 ## Features
 
 - **Topic Research** — Enter any topic and get a structured learning path with sections, resources, and citations
