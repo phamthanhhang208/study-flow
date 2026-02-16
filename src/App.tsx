@@ -40,7 +40,7 @@ function App() {
     activeSource,
     submitQuery,
     stopStream,
-    startNewTopic,
+    clearCurrentSession,
     loadSession,
     deleteSession,
     toggleSectionExpanded,
@@ -59,10 +59,12 @@ function App() {
   }, [currentSession])
 
   const handleNewTopic = useCallback(() => {
-    startNewTopic("New Topic")
+    // Clear current session to show the WelcomeScreen with prompts.
+    // A session is created when the user actually submits a query.
+    clearCurrentSession()
     setShowSettings(false)
     setTimeout(() => inputRef.current?.focus(), 100)
-  }, [startNewTopic])
+  }, [clearCurrentSession])
 
   useKeyboardShortcuts({
     onFocusInput: () => inputRef.current?.focus(),
@@ -99,6 +101,7 @@ function App() {
           }}
           onDeleteSession={deleteSession}
           onClose={() => setSidebarOpen(false)}
+          onToggle={() => setSidebarOpen(!sidebarOpen)}
         />
         <main id="main-content" className="flex flex-1 flex-col" role="main">
           {showSettings ? (
@@ -154,8 +157,8 @@ function App() {
                         </div>
                       )}
 
-                      {/* Agent thinking indicator */}
-                      {agentThinking && !currentResponse && (
+                      {/* Agent thinking for follow-up questions (before streaming text starts) */}
+                      {agentThinking && !currentResponse && currentSession.learningPath && (
                         <div className="mt-6 w-full max-w-4xl">
                           <AgentThinkingDisplay isThinking={agentThinking} steps={agentSteps} />
                         </div>

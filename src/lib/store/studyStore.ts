@@ -36,6 +36,7 @@ interface StudyState {
   loadSession: (id: string) => void
   deleteSession: (id: string) => void
   saveCurrentSession: () => void
+  clearCurrentSession: () => void
 
   // Learning path
   setLearningPath: (path: LearningPath) => void
@@ -152,6 +153,16 @@ export const useStudyStore = create<StudyState>()(
               lastAccessed: Date.now(),
             })),
           ),
+        })
+      },
+
+      clearCurrentSession: () => {
+        set({
+          currentSessionId: null,
+          agentSteps: [],
+          currentResponse: "",
+          currentCitations: [],
+          activeSource: null,
         })
       },
 

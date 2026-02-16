@@ -28,6 +28,7 @@ export function useStudyFlow() {
     submitQuery: handleUserInput,
     stopStream,
     startNewTopic: store.startNewTopic,
+    clearCurrentSession: store.clearCurrentSession,
     loadSession: store.loadSession,
     deleteSession: store.deleteSession,
     setLearningPath: store.setLearningPath,

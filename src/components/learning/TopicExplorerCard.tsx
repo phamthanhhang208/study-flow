@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../ui/card"
 import { Button } from "../ui/button"
 import { Separator } from "../ui/separator"
 import { SectionAccordion } from "./SectionAccordion"
-import { TopicExplorerSkeleton } from "./TopicExplorerSkeleton"
+import { AgentThinkingDisplay } from "../agent/AgentThinkingDisplay"
 import type { LearningPath, AgentStep, Citation, VideoMetadata } from "../../lib/api/types"
 
 interface TopicExplorerCardProps {
@@ -27,12 +27,12 @@ export function TopicExplorerCard({
 }: TopicExplorerCardProps) {
   const [showReasoning, setShowReasoning] = useState(false)
 
-  // Loading state
+  // Loading state — show AgentThinkingDisplay as the sole loading indicator
   if (isLoading && !learningPath) {
     return (
       <div className="w-full max-w-4xl">
         <h2 className="mb-6 text-2xl font-bold">{topic}</h2>
-        <TopicExplorerSkeleton />
+        <AgentThinkingDisplay isThinking={isLoading} steps={agentSteps} />
       </div>
     )
   }
