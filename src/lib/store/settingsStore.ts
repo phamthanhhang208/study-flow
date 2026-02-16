@@ -36,7 +36,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "studyflow-settings",
-      onRehydrate: () => {
+      onRehydrateStorage: () => {
         return (state) => {
           if (state) applyTheme(state.theme)
         }

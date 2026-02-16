@@ -1,11 +1,16 @@
 export class YouComApiError extends Error {
+  public status: number
+  public endpoint: string
+
   constructor(
     message: string,
-    public status: number,
-    public endpoint: string,
+    status: number,
+    endpoint: string,
   ) {
     super(message)
     this.name = "YouComApiError"
+    this.status = status
+    this.endpoint = endpoint
   }
 }
 

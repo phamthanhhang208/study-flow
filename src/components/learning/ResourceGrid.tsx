@@ -1,5 +1,6 @@
 import { FileText, Play } from "lucide-react"
 import { motion } from "framer-motion"
+import { easeOut } from "framer-motion"
 import { ResourceCard } from "./ResourceCard"
 import type { Resource, Citation, VideoMetadata } from "../../lib/api/types"
 
@@ -17,7 +18,7 @@ const container = {
 
 const item = {
   hidden: { opacity: 0, y: 8 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.25, ease: "easeOut" } },
+  show: { opacity: 1, y: 0, transition: { duration: 0.25, ease: easeOut } },
 }
 
 export function ResourceGrid({ resources, onOpenSource }: ResourceGridProps) {
