@@ -279,13 +279,17 @@ function enrichWithVideo(result: SearchWebResult): SearchWebResult {
   return result;
 }
 
-// ── Singleton for convenience ──
+// ── Client factory ──
 
-let defaultClient: YouComClient | null = null;
+let cachedClient: YouComClient | null = null;
+let cachedKey: string = "";
 
-export function getYouComClient(): YouComClient {
-  if (!defaultClient) {
-    defaultClient = new YouComClient();
+export function getYouComClient(apiKey?: string): YouComClient {
+  const effectiveKey = apiKey || import.meta.env.VITE_YOUCOM_API_KEY || "";
+
+  if (!cachedClient || effectiveKey !== cachedKey) {
+    cachedClient = new YouComClient(effectiveKey || undefined);
+    cachedKey = effectiveKey;
   }
-  return defaultClient;
+  return cachedClient;
 }

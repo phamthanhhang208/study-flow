@@ -4,10 +4,12 @@ import type {
   StudySession,
   LearningPath,
   AgentStep,
+  AgentStepType,
   AgentStepStatus,
   AgentResponse,
   Citation,
   SourceView,
+  VideoMetadata,
 } from "../api/types"
 
 function uuid(): string {
@@ -52,7 +54,7 @@ interface StudyState {
   clearCurrentResponse: () => void
 
   // Source modal
-  openSource: (citation: Citation, content: string | null) => void
+  openSource: (citation: Citation, content: string | null, video?: VideoMetadata) => void
   closeSource: () => void
 
   // UI
@@ -250,7 +252,7 @@ export const useStudyStore = create<StudyState>()(
 
       // ── Source modal ──
 
-      openSource: (citation, content) => set({ activeSource: { citation, content } }),
+      openSource: (citation, content, video) => set({ activeSource: { citation, content, video } }),
       closeSource: () => set({ activeSource: null }),
 
       // ── UI ──

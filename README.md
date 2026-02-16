@@ -1,73 +1,115 @@
-# React + TypeScript + Vite
+# StudyFlow
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+AI-powered learning companion that researches topics, organizes information, and creates structured study guides using the You.com API.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Topic Research** — Enter any topic and get a structured learning path with sections, resources, and citations
+- **Follow-up Q&A** — Ask questions about your topic with streaming AI responses
+- **Source Viewing** — Read articles and watch videos directly in-app with full-screen modals
+- **Export** — Download sessions as Markdown files
+- **Keyboard Shortcuts** — Cmd/Ctrl+K to focus input, Cmd/Ctrl+E to export, Cmd/Ctrl+N for new topic
+- **Dark Mode** — Light, dark, and system theme support
+- **Session Management** — Sidebar with date grouping, search, and session history
+- **Responsive Design** — Works on mobile (drawer sidebar), tablet, and desktop
 
-## React Compiler
+## Screenshots
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+*Coming soon*
 
-## Expanding the ESLint configuration
+## Tech Stack
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- **React 19** + TypeScript
+- **Vite** — Build tooling
+- **Tailwind CSS v3** + shadcn/ui design tokens
+- **Zustand** — State management with localStorage persistence
+- **Framer Motion** — Animations
+- **Sonner** — Toast notifications
+- **React Markdown** + Prism syntax highlighting
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## You.com APIs Used
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+| API | Endpoint | Purpose |
+|-----|----------|---------|
+| Search | `GET /search` | Web search for topic enrichment |
+| Agent | `POST /agents/runs` | AI research with SSE streaming |
+| Contents | `POST /contents` | Fetch article content for in-app reading |
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Setup
+
+1. Clone the repository:
+
+```bash
+git clone https://github.com/phamthanhhang208/study-flow.git
+cd study-flow
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+2. Install dependencies:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
 ```
+
+3. Set up your You.com API key. Either:
+   - Create a `.env` file with `VITE_YOUCOM_API_KEY=your_key_here`
+   - Or enter it in the Settings page within the app
+
+4. Start the development server:
+
+```bash
+npm run dev
+```
+
+5. Open [http://localhost:5173](http://localhost:5173) in your browser.
+
+## Build
+
+```bash
+npm run build
+```
+
+Output is in the `dist/` directory.
+
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Cmd/Ctrl + K` | Focus input |
+| `Cmd/Ctrl + E` | Export session |
+| `Cmd/Ctrl + N` | New topic |
+| `Cmd/Ctrl + /` | Show shortcuts help |
+| `Escape` | Close modals |
+| `Enter` | Send message |
+| `Shift + Enter` | New line |
+
+## Project Structure
+
+```
+src/
+├── components/
+│   ├── agent/          # AgentThinkingDisplay, ResponseCard, MarkdownRenderer, CitationCard
+│   ├── layout/         # Header, Sidebar, InputBar, WelcomeScreen
+│   ├── learning/       # TopicExplorerCard, SectionAccordion, ResourceCard, SessionCard
+│   ├── modals/         # SourceReaderModal, VideoPlayerModal, KeyboardShortcutsModal, YouTubeEmbed
+│   ├── ui/             # shadcn/ui primitives (button, card, dialog, etc.)
+│   ├── ErrorBoundary.tsx
+│   ├── SettingsPage.tsx
+│   └── ApiTestPage.tsx
+├── hooks/
+│   ├── useStudyFlow.ts         # Main app hook
+│   ├── useAgentOrchestration.ts # Topic/question orchestration
+│   ├── useAgentStream.ts       # SSE streaming
+│   ├── useKeyboardShortcuts.ts # Global keyboard shortcuts
+│   └── useDebounce.ts
+├── lib/
+│   ├── api/            # You.com client, types, error classes
+│   ├── store/          # Zustand stores (study, settings)
+│   ├── utils/          # cn, video detection
+│   ├── export.ts       # Markdown export
+│   └── query.ts        # React Query client
+└── App.tsx
+```
+
+## License
+
+MIT

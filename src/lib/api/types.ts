@@ -191,9 +191,11 @@ export interface LearningPath {
 }
 
 export type AgentStepStatus = "pending" | "running" | "complete" | "error"
+export type AgentStepType = "thinking" | "research" | "compute" | "complete"
 
 export interface AgentStep {
   stepNumber: number
+  type: AgentStepType
   label: string
   detail?: string
   status: AgentStepStatus
@@ -210,6 +212,7 @@ export interface AgentResponse {
 export interface SourceView {
   citation: Citation
   content: string | null
+  video?: VideoMetadata
 }
 
 export interface StudySession {
