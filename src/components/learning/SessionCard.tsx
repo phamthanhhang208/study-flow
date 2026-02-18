@@ -8,7 +8,7 @@ interface SessionCardProps {
 }
 
 export function SessionCard({ session, isActive, onClick }: SessionCardProps) {
-  const sectionCount = session.learningPath?.sections.length ?? 0
+  const sectionCount = session.learningPath?.subModules?.length ?? session.learningPath?.totalModules ?? 0
   const responseCount = session.responses.length
 
   return (

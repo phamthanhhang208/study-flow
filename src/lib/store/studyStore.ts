@@ -8,7 +8,12 @@ import type {
   Citation,
   SourceView,
   VideoMetadata,
+  OrchestrationStep,
+  QAMessage,
+  ModuleConversation,
+  TutorContext,
 } from "../api/types";
+import { askTutorQuestion } from "../api/tutorAgent";
 
 function uuid(): string {
   return crypto.randomUUID();
@@ -29,6 +34,16 @@ interface StudyState {
   currentCitations: Citation[];
   activeSource: SourceView | null;
 
+  // Orchestration state (transient)
+  isOrchestrating: boolean;
+  orchestrationStep: OrchestrationStep | null;
+  activeModuleId: string | null;
+
+  // Q&A tutor state
+  moduleConversations: Record<string, ModuleConversation>;
+  isAnswering: boolean;
+  tutorError: string | null;
+
   // Session actions
   startNewTopic: (topic: string) => void;
   loadSession: (id: string) => void;
@@ -38,7 +53,13 @@ interface StudyState {
 
   // Learning path
   setLearningPath: (path: LearningPath) => void;
-  toggleSectionExpanded: (sectionId: string) => void;
+  setActiveModule: (moduleId: string) => void;
+  setOrchestrating: (status: boolean) => void;
+  setOrchestrationStep: (step: OrchestrationStep) => void;
+
+  // Q&A tutor
+  askTutorQuestion: (question: string, apiKey?: string) => Promise<void>;
+  clearConversation: (moduleId: string) => void;
 
   // Agent reasoning steps
   addAgentStep: (step: Omit<AgentStep, "stepNumber">) => void;
@@ -101,6 +122,12 @@ export const useStudyStore = create<StudyState>()(
       currentResponse: "",
       currentCitations: [],
       activeSource: null,
+      isOrchestrating: false,
+      orchestrationStep: null,
+      activeModuleId: null,
+      moduleConversations: {},
+      isAnswering: false,
+      tutorError: null,
 
       // ── Session actions ──
 
@@ -110,6 +137,7 @@ export const useStudyStore = create<StudyState>()(
           id: uuid(),
           topic,
           learningPath: null,
+          activeModuleId: null,
           responses: [],
           createdAt: now,
           lastAccessed: now,
@@ -188,29 +216,109 @@ export const useStudyStore = create<StudyState>()(
         });
       },
 
-      toggleSectionExpanded: (sectionId) => {
+      setActiveModule: (moduleId) => {
+        set({ activeModuleId: moduleId });
+      },
+
+      setOrchestrating: (status) => {
+        set({ isOrchestrating: status });
+      },
+
+      setOrchestrationStep: (step) => {
+        set({ orchestrationStep: step });
+      },
+
+      // ── Q&A tutor ──
+
+      askTutorQuestion: async (question, apiKey) => {
         const state = get();
-        if (!state.currentSessionId) return;
+        const { activeModuleId } = state;
+        const session = getCurrentSession(state);
+
+        if (!activeModuleId || !session?.learningPath) return;
+
+        const activeModule = session.learningPath.subModules.find(
+          (m) => m.id === activeModuleId,
+        );
+        if (!activeModule) return;
+
+        // Add user message immediately
+        const userMessage: QAMessage = {
+          id: uuid(),
+          role: "user",
+          content: question,
+          timestamp: Date.now(),
+        };
+
+        const existingConvo = state.moduleConversations[activeModuleId] || {
+          moduleId: activeModuleId,
+          moduleName: activeModule.title,
+          messages: [],
+          lastUpdated: Date.now(),
+        };
+
         set({
-          sessions: updateSession(
-            state.sessions,
-            state.currentSessionId,
-            (s) => {
-              if (!s.learningPath) return s;
-              return {
-                ...s,
-                learningPath: {
-                  ...s.learningPath,
-                  sections: s.learningPath.sections.map((sec) =>
-                    sec.id === sectionId
-                      ? { ...sec, isExpanded: !sec.isExpanded }
-                      : sec,
-                  ),
-                },
-              };
+          moduleConversations: {
+            ...state.moduleConversations,
+            [activeModuleId]: {
+              ...existingConvo,
+              messages: [...existingConvo.messages, userMessage],
+              lastUpdated: Date.now(),
             },
-          ),
+          },
+          isAnswering: true,
+          tutorError: null,
         });
+
+        // Build context
+        const context: TutorContext = {
+          topic: session.learningPath.topic,
+          moduleTitle: activeModule.title,
+          moduleDescription: activeModule.description,
+          moduleContent: activeModule.description,
+          availableArticles: activeModule.articles,
+          availableVideos: activeModule.videos,
+          conversationHistory: existingConvo.messages,
+        };
+
+        try {
+          const response = await askTutorQuestion(question, context, apiKey);
+
+          const assistantMessage: QAMessage = {
+            id: uuid(),
+            role: "assistant",
+            content: response.answer,
+            citations: response.citations,
+            suggestedFollowUps: response.suggestedFollowUps,
+            timestamp: Date.now(),
+          };
+
+          const updatedConvo = get().moduleConversations[activeModuleId];
+          set({
+            moduleConversations: {
+              ...get().moduleConversations,
+              [activeModuleId]: {
+                ...updatedConvo,
+                messages: [...updatedConvo.messages, assistantMessage],
+                lastUpdated: Date.now(),
+              },
+            },
+            isAnswering: false,
+          });
+        } catch (error) {
+          console.error("Tutor question failed:", error);
+          set({
+            isAnswering: false,
+            tutorError: "Failed to get answer. Please try again.",
+          });
+        }
+      },
+
+      clearConversation: (moduleId) => {
+        const state = get();
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { [moduleId]: _, ...rest } = state.moduleConversations;
+        set({ moduleConversations: rest, tutorError: null });
       },
 
       // ── Agent steps ──
@@ -289,6 +397,7 @@ export const useStudyStore = create<StudyState>()(
       partialize: (state) => ({
         sessions: state.sessions,
         currentSessionId: state.currentSessionId,
+        moduleConversations: state.moduleConversations,
       }),
     },
   ),

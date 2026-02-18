@@ -23,6 +23,14 @@ export function useStudyFlow() {
     currentResponse: store.currentResponse,
     currentCitations: store.currentCitations,
     activeSource: store.activeSource,
+    isOrchestrating: store.isOrchestrating,
+    orchestrationStep: store.orchestrationStep,
+    activeModuleId: store.activeModuleId,
+
+    // Q&A tutor
+    moduleConversations: store.moduleConversations,
+    isAnswering: store.isAnswering,
+    tutorError: store.tutorError,
 
     // Actions
     submitQuery: handleUserInput,
@@ -32,9 +40,11 @@ export function useStudyFlow() {
     loadSession: store.loadSession,
     deleteSession: store.deleteSession,
     setLearningPath: store.setLearningPath,
-    toggleSectionExpanded: store.toggleSectionExpanded,
+    setActiveModule: store.setActiveModule,
     appendResponseChunk: store.appendResponseChunk,
     addResponse: store.addResponse,
+    askTutorQuestion: store.askTutorQuestion,
+    clearConversation: store.clearConversation,
     openSource: store.openSource,
     closeSource: store.closeSource,
     setSidebarOpen: store.setSidebarOpen,

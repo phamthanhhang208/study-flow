@@ -190,7 +190,7 @@ export function Sidebar({
                             <p className="truncate leading-snug">{session.topic}</p>
                             <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
                               {session.learningPath
-                                ? `${session.learningPath.sections.length} sections`
+                                ? `${session.learningPath.subModules?.length ?? session.learningPath.totalModules} modules`
                                 : "New topic"}
                               {session.responses.length > 0 &&
                                 ` · ${session.responses.length} Q&A`}

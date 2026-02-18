@@ -168,6 +168,112 @@ export interface ContentResponse {
 
 // ── App-level types (study flow) ──
 
+export interface ArticleResource {
+  id: string
+  url: string
+  title: string
+  description: string
+  snippet: string
+  domain: string
+  favicon?: string
+  publishedDate?: string
+  estimatedReadMinutes?: number
+}
+
+export interface VideoResource {
+  id: string
+  url: string
+  title: string
+  description: string
+  platform: "youtube" | "vimeo"
+  videoId: string
+  thumbnail: string
+  channelName?: string
+  duration?: string
+  publishedDate?: string
+}
+
+export interface SubModule {
+  id: string
+  order: number
+  title: string
+  description: string
+  estimatedMinutes: number
+  searchQuery: string
+  difficulty: "beginner" | "intermediate" | "advanced"
+  articles: ArticleResource[]
+  videos: VideoResource[]
+  status: "pending" | "loading" | "complete" | "error"
+}
+
+export interface LearningPath {
+  id: string
+  topic: string
+  overview: string
+  totalModules: number
+  estimatedTotalMinutes: number
+  difficulty: "beginner" | "intermediate" | "advanced"
+  subModules: SubModule[]
+  createdAt: Date
+  generatedBy: "llm"
+}
+
+export interface LLMModuleOutline {
+  topic: string
+  overview: string
+  difficulty: "beginner" | "intermediate" | "advanced"
+  estimatedTotalMinutes: number
+  modules: Array<{
+    order: number
+    title: string
+    description: string
+    estimatedMinutes: number
+    searchQuery: string
+    difficulty: "beginner" | "intermediate" | "advanced"
+  }>
+}
+
+export type OrchestrationStep =
+  | { step: "generating"; message: string }
+  | { step: "searching"; message: string }
+  | { step: "complete"; message: string }
+  | { step: "error"; message: string; error: Error }
+
+// ── Q&A Tutor types ──
+
+export interface QAMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  citations?: Citation[];
+  suggestedFollowUps?: string[];
+  timestamp: number;
+}
+
+export interface ModuleConversation {
+  moduleId: string;
+  moduleName: string;
+  messages: QAMessage[];
+  lastUpdated: number;
+}
+
+export interface TutorContext {
+  topic: string;
+  moduleTitle: string;
+  moduleDescription: string;
+  moduleContent: string;
+  availableArticles: ArticleResource[];
+  availableVideos: VideoResource[];
+  conversationHistory: QAMessage[];
+}
+
+export interface TutorResponse {
+  answer: string;
+  citations: Citation[];
+  suggestedFollowUps: string[];
+}
+
+// Legacy types kept for backward compatibility during migration
 export interface Resource {
   title: string
   url: string
@@ -182,12 +288,6 @@ export interface Section {
   content: string
   resources: Resource[]
   isExpanded: boolean
-}
-
-export interface LearningPath {
-  topic: string
-  summary: string
-  sections: Section[]
 }
 
 export type AgentStepStatus = "pending" | "running" | "complete" | "error"
@@ -219,6 +319,7 @@ export interface StudySession {
   id: string
   topic: string
   learningPath: LearningPath | null
+  activeModuleId: string | null
   responses: AgentResponse[]
   createdAt: number
   lastAccessed: number

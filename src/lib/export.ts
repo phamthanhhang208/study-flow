@@ -1,4 +1,4 @@
-import type { StudySession } from "./api/types"
+import type { StudySession, ModuleConversation } from "./api/types"
 
 export function exportToMarkdown(session: StudySession): string {
   const lines: string[] = []
@@ -11,21 +11,29 @@ export function exportToMarkdown(session: StudySession): string {
   // Learning path
   if (session.learningPath) {
     const lp = session.learningPath
-    if (lp.summary) {
-      lines.push(lp.summary)
+    if (lp.overview) {
+      lines.push(lp.overview)
       lines.push("")
     }
 
-    for (const section of lp.sections) {
-      lines.push(`## ${section.title}`)
+    for (const mod of lp.subModules) {
+      lines.push(`## ${mod.title}`)
       lines.push("")
-      lines.push(section.content)
+      lines.push(mod.description)
       lines.push("")
 
-      if (section.resources.length > 0) {
-        lines.push("**Resources:**")
-        for (const r of section.resources) {
-          lines.push(`- [${r.title}](${r.url})${r.snippet ? ` — ${r.snippet}` : ""}`)
+      if (mod.articles.length > 0) {
+        lines.push("**Articles:**")
+        for (const a of mod.articles) {
+          lines.push(`- [${a.title}](${a.url})${a.snippet ? ` — ${a.snippet}` : ""}`)
+        }
+        lines.push("")
+      }
+
+      if (mod.videos.length > 0) {
+        lines.push("**Videos:**")
+        for (const v of mod.videos) {
+          lines.push(`- [${v.title}](${v.url})${v.channelName ? ` — ${v.channelName}` : ""}`)
         }
         lines.push("")
       }
@@ -72,6 +80,55 @@ export function exportSession(session: StudySession) {
   const md = exportToMarkdown(session)
   const safeName = session.topic.replace(/[^a-zA-Z0-9 -]/g, "").replace(/\s+/g, "-").toLowerCase()
   downloadMarkdown(md, `${safeName}.md`)
+}
+
+export function exportConversationToMarkdown(
+  conversation: ModuleConversation,
+  moduleName: string,
+): string {
+  const lines: string[] = []
+
+  lines.push(`# Conversation: ${moduleName}`)
+  lines.push("")
+  lines.push(`*${conversation.messages.length} messages*`)
+  lines.push("")
+  lines.push("---")
+  lines.push("")
+
+  for (const message of conversation.messages) {
+    const role = message.role === "user" ? "**You**" : "**Tutor**"
+    const timestamp = new Date(message.timestamp).toLocaleString()
+
+    lines.push(`### ${role} - ${timestamp}`)
+    lines.push("")
+    lines.push(message.content)
+    lines.push("")
+
+    if (message.citations && message.citations.length > 0) {
+      lines.push("**Sources:**")
+      for (const c of message.citations) {
+        lines.push(`- [${c.title}](${c.url})`)
+      }
+      lines.push("")
+    }
+
+    lines.push("---")
+    lines.push("")
+  }
+
+  return lines.join("\n")
+}
+
+export function downloadConversation(
+  conversation: ModuleConversation,
+  moduleName: string,
+) {
+  const md = exportConversationToMarkdown(conversation, moduleName)
+  const safeName = moduleName
+    .replace(/[^a-zA-Z0-9 -]/g, "")
+    .replace(/\s+/g, "-")
+    .toLowerCase()
+  downloadMarkdown(md, `conversation-${safeName}.md`)
 }
 
 export function exportAllSessions(sessions: StudySession[]) {

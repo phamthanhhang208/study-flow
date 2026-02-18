@@ -1,20 +1,24 @@
-import { useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { BookOpen, ChevronDown, Brain } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "../ui/card"
-import { Button } from "../ui/button"
-import { Separator } from "../ui/separator"
-import { SectionAccordion } from "./SectionAccordion"
-import { AgentThinkingDisplay } from "../agent/AgentThinkingDisplay"
-import type { LearningPath, AgentStep, Citation, VideoMetadata } from "../../lib/api/types"
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { BookOpen, ChevronDown, Brain } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+import { Button } from "../ui/button";
+import { Separator } from "../ui/separator";
+import { AgentThinkingDisplay } from "../agent/AgentThinkingDisplay";
+import type {
+  LearningPath,
+  AgentStep,
+  Citation,
+  VideoMetadata,
+} from "../../lib/api/types";
 
 interface TopicExplorerCardProps {
-  topic: string
-  learningPath: LearningPath | null
-  agentSteps: AgentStep[]
-  isLoading: boolean
-  onToggleSection: (sectionId: string) => void
-  onOpenSource: (citation: Citation, video?: VideoMetadata) => void
+  topic: string;
+  learningPath: LearningPath | null;
+  agentSteps: AgentStep[];
+  isLoading: boolean;
+  onToggleSection?: (sectionId: string) => void;
+  onOpenSource: (citation: Citation, video?: VideoMetadata) => void;
 }
 
 export function TopicExplorerCard({
@@ -22,10 +26,8 @@ export function TopicExplorerCard({
   learningPath,
   agentSteps,
   isLoading,
-  onToggleSection,
-  onOpenSource,
 }: TopicExplorerCardProps) {
-  const [showReasoning, setShowReasoning] = useState(false)
+  const [showReasoning, setShowReasoning] = useState(false);
 
   // Loading state — show AgentThinkingDisplay as the sole loading indicator
   if (isLoading && !learningPath) {
@@ -34,7 +36,7 @@ export function TopicExplorerCard({
         <h2 className="mb-6 text-2xl font-bold">{topic}</h2>
         <AgentThinkingDisplay isThinking={isLoading} steps={agentSteps} />
       </div>
-    )
+    );
   }
 
   // Empty state
@@ -44,10 +46,11 @@ export function TopicExplorerCard({
         <BookOpen className="h-12 w-12 text-muted-foreground/40" />
         <h2 className="mt-4 text-xl font-semibold">{topic}</h2>
         <p className="mt-2 max-w-md text-sm text-muted-foreground">
-          Ask a question about this topic to generate a learning path with sections and resources.
+          Ask a question about this topic to generate a learning path with
+          sections and resources.
         </p>
       </div>
-    )
+    );
   }
 
   return (
@@ -61,7 +64,7 @@ export function TopicExplorerCard({
       <div className="mb-6">
         <h2 className="text-2xl font-bold">{learningPath.topic}</h2>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          {learningPath.summary}
+          {learningPath.overview ?? ""}
         </p>
       </div>
 
@@ -98,7 +101,10 @@ export function TopicExplorerCard({
                 <CardContent className="pt-0">
                   <div className="space-y-2">
                     {agentSteps.map((step) => (
-                      <div key={step.stepNumber} className="flex items-start gap-3 text-sm">
+                      <div
+                        key={step.stepNumber}
+                        className="flex items-start gap-3 text-sm"
+                      >
                         <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
                           {step.stepNumber}
                         </div>
@@ -117,7 +123,9 @@ export function TopicExplorerCard({
                             {step.label}
                           </span>
                           {step.detail && (
-                            <p className="mt-0.5 text-xs text-muted-foreground">{step.detail}</p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              {step.detail}
+                            </p>
                           )}
                         </div>
                       </div>
@@ -130,25 +138,45 @@ export function TopicExplorerCard({
         </Card>
       )}
 
-      {/* Sections */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">
-            Learning Path
-            <span className="ml-2 text-sm font-normal text-muted-foreground">
-              {learningPath.sections.length} section{learningPath.sections.length !== 1 ? "s" : ""}
-            </span>
-          </CardTitle>
-        </CardHeader>
-        <Separator />
-        <CardContent className="pt-4">
-          <SectionAccordion
-            sections={learningPath.sections}
-            onToggle={onToggleSection}
-            onOpenSource={onOpenSource}
-          />
-        </CardContent>
-      </Card>
+      {/* Sub-modules */}
+      {learningPath.subModules && learningPath.subModules.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">
+              Learning Path
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                {learningPath.subModules.length} module
+                {learningPath.subModules.length !== 1 ? "s" : ""}
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <Separator />
+          <CardContent className="pt-4">
+            <div className="space-y-4">
+              {learningPath.subModules.map((mod) => (
+                <div key={mod.id} className="rounded-lg border p-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="font-medium">{mod.title}</h4>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {mod.description}
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                      {mod.estimatedMinutes} min
+                    </span>
+                  </div>
+                  <div className="mt-3 flex gap-4 text-xs text-muted-foreground">
+                    <span>{mod.articles.length} articles</span>
+                    <span>{mod.videos.length} videos</span>
+                    <span className="capitalize">{mod.difficulty}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </motion.div>
-  )
+  );
 }
