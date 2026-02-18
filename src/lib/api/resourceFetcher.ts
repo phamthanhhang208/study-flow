@@ -8,20 +8,22 @@ interface DetectedVideo {
   videoId: string;
 }
 
-const VIDEO_REGEXES: Array<{ platform: "youtube" | "vimeo"; pattern: RegExp }> = [
-  {
-    platform: "youtube",
-    pattern: /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
-  },
-  {
-    platform: "vimeo",
-    pattern: /(?:vimeo\.com\/)(\d+)/,
-  },
-  {
-    platform: "vimeo",
-    pattern: /(?:player\.vimeo\.com\/video\/)(\d+)/,
-  },
-];
+const VIDEO_REGEXES: Array<{ platform: "youtube" | "vimeo"; pattern: RegExp }> =
+  [
+    {
+      platform: "youtube",
+      pattern:
+        /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
+    },
+    {
+      platform: "vimeo",
+      pattern: /(?:vimeo\.com\/)(\d+)/,
+    },
+    {
+      platform: "vimeo",
+      pattern: /(?:player\.vimeo\.com\/video\/)(\d+)/,
+    },
+  ];
 
 function detectVideo(url: string): DetectedVideo | null {
   for (const { platform, pattern } of VIDEO_REGEXES) {
@@ -45,7 +47,6 @@ interface OEmbedData {
 
 async function enrichVideoMetadata(
   url: string,
-  videoId: string,
   platform: "youtube" | "vimeo",
 ): Promise<OEmbedData> {
   try {
@@ -54,7 +55,9 @@ async function enrichVideoMetadata(
         ? `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`
         : `https://vimeo.com/api/oembed.json?url=${encodeURIComponent(url)}`;
 
-    const response = await fetch(oembedUrl, { signal: AbortSignal.timeout(5000) });
+    const response = await fetch(oembedUrl, {
+      signal: AbortSignal.timeout(5000),
+    });
     if (!response.ok) return {};
 
     const data = await response.json();
@@ -102,11 +105,9 @@ async function buildVideoResource(
   index: number,
 ): Promise<VideoResource> {
   const thumbnail =
-    video.platform === "youtube"
-      ? getYouTubeThumbnail(video.videoId)
-      : "";
+    video.platform === "youtube" ? getYouTubeThumbnail(video.videoId) : "";
 
-  const oembed = await enrichVideoMetadata(result.url, video.videoId, video.platform);
+  const oembed = await enrichVideoMetadata(result.url, video.platform);
 
   return {
     id: `${moduleId}-video-${index}`,
@@ -133,7 +134,9 @@ export async function fetchModuleResources(
   // Two parallel searches: general + video-focused
   const [generalResults, videoResults] = await Promise.all([
     client.search(searchQuery, { count: 10 }).catch(() => null),
-    client.search(`${searchQuery} tutorial video youtube`, { count: 5 }).catch(() => null),
+    client
+      .search(`${searchQuery} tutorial video youtube`, { count: 5 })
+      .catch(() => null),
   ]);
 
   // Combine and deduplicate by URL
@@ -151,7 +154,8 @@ export async function fetchModuleResources(
   }
 
   // Separate videos from articles
-  const videoEntries: Array<{ result: SearchWebResult; video: DetectedVideo }> = [];
+  const videoEntries: Array<{ result: SearchWebResult; video: DetectedVideo }> =
+    [];
   const articleEntries: SearchWebResult[] = [];
 
   for (const result of allResults) {
@@ -171,7 +175,9 @@ export async function fetchModuleResources(
   const videos = await Promise.all(
     videoEntries
       .slice(0, 3)
-      .map(({ result, video }, i) => buildVideoResource(result, video, moduleId, i)),
+      .map(({ result, video }, i) =>
+        buildVideoResource(result, video, moduleId, i),
+      ),
   );
 
   return { articles, videos };
