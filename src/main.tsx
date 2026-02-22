@@ -1,14 +1,15 @@
-import { StrictMode } from "react"
-import { createRoot } from "react-dom/client"
-import { QueryClientProvider } from "@tanstack/react-query"
-import { BrowserRouter, Routes, Route } from "react-router-dom"
-import { Toaster } from "sonner"
-import { queryClient } from "./lib/query"
-import { ErrorBoundary } from "./components/ErrorBoundary"
-import { AuthProvider } from "./context/AuthContext"
-import ShareView from "./pages/ShareView"
-import "./index.css"
-import App from "./App.tsx"
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Toaster } from "sonner";
+import { queryClient } from "./lib/query";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { AuthProvider } from "./context/AuthContext";
+import ShareView from "./pages/ShareView";
+import "./index.css";
+import App from "./App.tsx";
+import { Analytics } from "@vercel/analytics/next";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -25,5 +26,6 @@ createRoot(document.getElementById("root")!).render(
         </AuthProvider>
       </QueryClientProvider>
     </ErrorBoundary>
+    <Analytics />
   </StrictMode>,
-)
+);
