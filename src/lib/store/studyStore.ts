@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 import type {
   StudySession,
   LearningPath,
@@ -14,6 +13,16 @@ import type {
   TutorContext,
 } from "../api/types";
 import { askTutorQuestion } from "../api/tutorAgent";
+import {
+  fetchUserPaths,
+  saveLearningPath,
+  deleteLearningPath,
+} from "../db/learningPaths";
+import {
+  fetchUserProgress,
+  markModuleComplete,
+  unmarkModuleComplete,
+} from "../db/moduleProgress";
 
 function uuid(): string {
   return crypto.randomUUID();
@@ -22,9 +31,10 @@ function uuid(): string {
 // ── State shape ──
 
 interface StudyState {
-  // Persisted
+  // Cloud-backed (no localStorage)
   sessions: StudySession[];
   currentSessionId: string | null;
+  isLoadingPaths: boolean;
 
   // Transient UI state
   sidebarOpen: boolean;
@@ -39,20 +49,25 @@ interface StudyState {
   orchestrationStep: OrchestrationStep | null;
   activeModuleId: string | null;
 
-  // Q&A tutor state
+  // Module progress (cloud-backed)
+  completedModuleIds: Set<string>;
+
+  // Q&A tutor state (transient — not persisted to Supabase in Phase 2)
   moduleConversations: Record<string, ModuleConversation>;
   isAnswering: boolean;
   tutorError: string | null;
 
   // Session actions
+  loadUserPaths: (userId: string) => Promise<void>;
+  loadUserProgress: () => Promise<void>;
+  toggleModuleComplete: (moduleId: string) => Promise<void>;
   startNewTopic: (topic: string) => void;
   loadSession: (id: string) => void;
-  deleteSession: (id: string) => void;
-  saveCurrentSession: () => void;
+  deleteSession: (id: string) => Promise<void>;
   clearCurrentSession: () => void;
 
   // Learning path
-  setLearningPath: (path: LearningPath) => void;
+  setLearningPath: (path: LearningPath, userId: string) => Promise<void>;
   setActiveModule: (moduleId: string) => void;
   setOrchestrating: (status: boolean) => void;
   setOrchestrationStep: (step: OrchestrationStep) => void;
@@ -94,311 +109,355 @@ function getCurrentSession(state: StudyState): StudySession | undefined {
   return state.sessions.find((s) => s.id === state.currentSessionId);
 }
 
-function updateSession(
-  sessions: StudySession[],
-  id: string,
-  updater: (session: StudySession) => StudySession,
-): StudySession[] {
-  return sessions.map((s) => (s.id === id ? updater(s) : s));
-}
-
 function sortByLastAccessed(sessions: StudySession[]): StudySession[] {
   return [...sessions].sort((a, b) => b.lastAccessed - a.lastAccessed);
 }
 
-// ── Store ──
+// ── Store (no persist — Supabase is the persistence layer) ──
 
-export const useStudyStore = create<StudyState>()(
-  persist(
-    (set, get) => ({
-      // Persisted defaults
-      sessions: [],
-      currentSessionId: null,
+export const useStudyStore = create<StudyState>()((set, get) => ({
+  // Defaults
+  sessions: [],
+  currentSessionId: null,
+  isLoadingPaths: false,
 
-      // Transient defaults
-      sidebarOpen: true,
-      agentThinking: false,
+  sidebarOpen: true,
+  agentThinking: false,
+  agentSteps: [],
+  currentResponse: "",
+  currentCitations: [],
+  activeSource: null,
+  isOrchestrating: false,
+  orchestrationStep: null,
+  activeModuleId: null,
+  completedModuleIds: new Set<string>(),
+  moduleConversations: {},
+  isAnswering: false,
+  tutorError: null,
+
+  // ── Cloud sync ──
+
+  loadUserPaths: async (userId) => {
+    set({ isLoadingPaths: true });
+    try {
+      const sessions = await fetchUserPaths();
+      set({
+        sessions: sortByLastAccessed(sessions),
+        currentSessionId: null,
+        activeModuleId: null,
+        isLoadingPaths: false,
+      });
+    } catch (err) {
+      console.error("loadUserPaths failed:", err);
+      set({ isLoadingPaths: false });
+    }
+    void userId; // userId used for RLS via session cookie
+  },
+
+  loadUserProgress: async () => {
+    try {
+      const ids = await fetchUserProgress();
+      set({ completedModuleIds: ids });
+    } catch (err) {
+      console.error("loadUserProgress failed:", err);
+    }
+  },
+
+  toggleModuleComplete: async (moduleId) => {
+    const { completedModuleIds } = get();
+    const isCompleted = completedModuleIds.has(moduleId);
+    const next = new Set(completedModuleIds);
+    if (isCompleted) {
+      next.delete(moduleId);
+    } else {
+      next.add(moduleId);
+    }
+    set({ completedModuleIds: next });
+    try {
+      if (isCompleted) {
+        await unmarkModuleComplete(moduleId);
+      } else {
+        await markModuleComplete(moduleId);
+      }
+    } catch (err) {
+      // Revert on error
+      set({ completedModuleIds });
+      console.error("toggleModuleComplete failed:", err);
+      throw err;
+    }
+  },
+
+  // ── Session actions ──
+
+  startNewTopic: (topic) => {
+    const now = Date.now();
+    const session: StudySession = {
+      id: uuid(),
+      topic,
+      learningPath: null,
+      activeModuleId: null,
+      responses: [],
+      createdAt: now,
+      lastAccessed: now,
+    };
+    set((state) => ({
+      sessions: sortByLastAccessed([session, ...state.sessions]),
+      currentSessionId: session.id,
       agentSteps: [],
       currentResponse: "",
       currentCitations: [],
       activeSource: null,
-      isOrchestrating: false,
-      orchestrationStep: null,
       activeModuleId: null,
-      moduleConversations: {},
-      isAnswering: false,
-      tutorError: null,
+    }));
+  },
 
-      // ── Session actions ──
-
-      startNewTopic: (topic) => {
-        const now = Date.now();
-        const session: StudySession = {
-          id: uuid(),
-          topic,
-          learningPath: null,
-          activeModuleId: null,
-          responses: [],
-          createdAt: now,
-          lastAccessed: now,
-        };
-        set((state) => ({
-          sessions: sortByLastAccessed([session, ...state.sessions]),
-          currentSessionId: session.id,
-          agentSteps: [],
-          currentResponse: "",
-          currentCitations: [],
-          activeSource: null,
-        }));
-      },
-
-      loadSession: (id) => {
-        set((state) => ({
-          currentSessionId: id,
-          sessions: sortByLastAccessed(
-            updateSession(state.sessions, id, (s) => ({
-              ...s,
-              lastAccessed: Date.now(),
-            })),
+  loadSession: (id) => {
+    set((state) => {
+      const session = state.sessions.find((s) => s.id === id);
+      return {
+        currentSessionId: id,
+        sessions: sortByLastAccessed(
+          state.sessions.map((s) =>
+            s.id === id ? { ...s, lastAccessed: Date.now() } : s,
           ),
-          agentSteps: [],
-          currentResponse: "",
-          currentCitations: [],
-          activeSource: null,
-        }));
-      },
+        ),
+        activeModuleId:
+          session?.learningPath?.subModules[0]?.id ??
+          state.activeModuleId,
+        agentSteps: [],
+        currentResponse: "",
+        currentCitations: [],
+        activeSource: null,
+      };
+    });
+  },
 
-      deleteSession: (id) => {
-        set((state) => ({
-          sessions: state.sessions.filter((s) => s.id !== id),
-          currentSessionId:
-            state.currentSessionId === id ? null : state.currentSessionId,
-        }));
-      },
+  deleteSession: async (id) => {
+    set((state) => ({
+      sessions: state.sessions.filter((s) => s.id !== id),
+      currentSessionId:
+        state.currentSessionId === id ? null : state.currentSessionId,
+      activeModuleId:
+        state.currentSessionId === id ? null : state.activeModuleId,
+    }));
+    try {
+      await deleteLearningPath(id);
+    } catch (err) {
+      console.error("deleteSession Supabase error:", err);
+    }
+  },
 
-      saveCurrentSession: () => {
-        const state = get();
-        const session = getCurrentSession(state);
-        if (!session) return;
-        set({
-          sessions: sortByLastAccessed(
-            updateSession(state.sessions, session.id, (s) => ({
-              ...s,
-              lastAccessed: Date.now(),
-            })),
-          ),
-        });
-      },
+  clearCurrentSession: () => {
+    set({
+      currentSessionId: null,
+      agentSteps: [],
+      currentResponse: "",
+      currentCitations: [],
+      activeSource: null,
+      activeModuleId: null,
+    });
+  },
 
-      clearCurrentSession: () => {
-        set({
-          currentSessionId: null,
-          agentSteps: [],
-          currentResponse: "",
-          currentCitations: [],
-          activeSource: null,
-        });
-      },
+  // ── Learning path ──
 
-      // ── Learning path ──
+  setLearningPath: async (path, userId) => {
+    const state = get();
+    if (!state.currentSessionId) return;
 
-      setLearningPath: (path) => {
-        const state = get();
-        if (!state.currentSessionId) return;
-        set({
-          sessions: sortByLastAccessed(
-            updateSession(state.sessions, state.currentSessionId, (s) => ({
-              ...s,
-              learningPath: path,
-              lastAccessed: Date.now(),
-            })),
-          ),
-        });
-      },
+    // Update local state immediately
+    set({
+      sessions: sortByLastAccessed(
+        state.sessions.map((s) =>
+          s.id === state.currentSessionId
+            ? { ...s, learningPath: path, lastAccessed: Date.now() }
+            : s,
+        ),
+      ),
+    });
 
-      setActiveModule: (moduleId) => {
-        set({ activeModuleId: moduleId });
-      },
+    // Persist to Supabase in background
+    try {
+      await saveLearningPath(userId, path);
+    } catch (err) {
+      console.error("setLearningPath Supabase save error:", err);
+    }
+  },
 
-      setOrchestrating: (status) => {
-        set({ isOrchestrating: status });
-      },
+  setActiveModule: (moduleId) => {
+    set({ activeModuleId: moduleId });
+  },
 
-      setOrchestrationStep: (step) => {
-        set({ orchestrationStep: step });
-      },
+  setOrchestrating: (status) => {
+    set({ isOrchestrating: status });
+  },
 
-      // ── Q&A tutor ──
+  setOrchestrationStep: (step) => {
+    set({ orchestrationStep: step });
+  },
 
-      askTutorQuestion: async (question, apiKey) => {
-        const state = get();
-        const { activeModuleId } = state;
-        const session = getCurrentSession(state);
+  // ── Q&A tutor ──
 
-        if (!activeModuleId || !session?.learningPath) return;
+  askTutorQuestion: async (question, apiKey) => {
+    const state = get();
+    const { activeModuleId } = state;
+    const session = getCurrentSession(state);
 
-        const activeModule = session.learningPath.subModules.find(
-          (m) => m.id === activeModuleId,
-        );
-        if (!activeModule) return;
+    if (!activeModuleId || !session?.learningPath) return;
 
-        // Add user message immediately
-        const userMessage: QAMessage = {
-          id: uuid(),
-          role: "user",
-          content: question,
-          timestamp: Date.now(),
-        };
+    const activeModule = session.learningPath.subModules.find(
+      (m) => m.id === activeModuleId,
+    );
+    if (!activeModule) return;
 
-        const existingConvo = state.moduleConversations[activeModuleId] || {
-          moduleId: activeModuleId,
-          moduleName: activeModule.title,
-          messages: [],
+    const userMessage: QAMessage = {
+      id: uuid(),
+      role: "user",
+      content: question,
+      timestamp: Date.now(),
+    };
+
+    const existingConvo = state.moduleConversations[activeModuleId] || {
+      moduleId: activeModuleId,
+      moduleName: activeModule.title,
+      messages: [],
+      lastUpdated: Date.now(),
+    };
+
+    set({
+      moduleConversations: {
+        ...state.moduleConversations,
+        [activeModuleId]: {
+          ...existingConvo,
+          messages: [...existingConvo.messages, userMessage],
           lastUpdated: Date.now(),
-        };
+        },
+      },
+      isAnswering: true,
+      tutorError: null,
+    });
 
-        set({
-          moduleConversations: {
-            ...state.moduleConversations,
-            [activeModuleId]: {
-              ...existingConvo,
-              messages: [...existingConvo.messages, userMessage],
-              lastUpdated: Date.now(),
-            },
+    const context: TutorContext = {
+      topic: session.learningPath.topic,
+      moduleTitle: activeModule.title,
+      moduleDescription: activeModule.description,
+      moduleContent: activeModule.description,
+      availableArticles: activeModule.articles,
+      availableVideos: activeModule.videos,
+      conversationHistory: existingConvo.messages,
+    };
+
+    try {
+      const response = await askTutorQuestion(question, context, apiKey);
+
+      const assistantMessage: QAMessage = {
+        id: uuid(),
+        role: "assistant",
+        content: response.answer,
+        citations: response.citations,
+        suggestedFollowUps: response.suggestedFollowUps,
+        timestamp: Date.now(),
+      };
+
+      const updatedConvo = get().moduleConversations[activeModuleId];
+      set({
+        moduleConversations: {
+          ...get().moduleConversations,
+          [activeModuleId]: {
+            ...updatedConvo,
+            messages: [...updatedConvo.messages, assistantMessage],
+            lastUpdated: Date.now(),
           },
-          isAnswering: true,
-          tutorError: null,
-        });
+        },
+        isAnswering: false,
+      });
+    } catch (error) {
+      console.error("Tutor question failed:", error);
+      set({
+        isAnswering: false,
+        tutorError: "Failed to get answer. Please try again.",
+      });
+    }
+  },
 
-        // Build context
-        const context: TutorContext = {
-          topic: session.learningPath.topic,
-          moduleTitle: activeModule.title,
-          moduleDescription: activeModule.description,
-          moduleContent: activeModule.description,
-          availableArticles: activeModule.articles,
-          availableVideos: activeModule.videos,
-          conversationHistory: existingConvo.messages,
-        };
+  clearConversation: (moduleId) => {
+    const state = get();
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { [moduleId]: _, ...rest } = state.moduleConversations;
+    set({ moduleConversations: rest, tutorError: null });
+  },
 
-        try {
-          const response = await askTutorQuestion(question, context, apiKey);
+  // ── Agent steps ──
 
-          const assistantMessage: QAMessage = {
-            id: uuid(),
-            role: "assistant",
-            content: response.answer,
-            citations: response.citations,
-            suggestedFollowUps: response.suggestedFollowUps,
-            timestamp: Date.now(),
-          };
+  addAgentStep: (step) => {
+    set((state) => ({
+      agentSteps: [
+        ...state.agentSteps,
+        { ...step, stepNumber: state.agentSteps.length + 1 },
+      ],
+    }));
+  },
 
-          const updatedConvo = get().moduleConversations[activeModuleId];
-          set({
-            moduleConversations: {
-              ...get().moduleConversations,
-              [activeModuleId]: {
-                ...updatedConvo,
-                messages: [...updatedConvo.messages, assistantMessage],
-                lastUpdated: Date.now(),
-              },
-            },
-            isAnswering: false,
-          });
-        } catch (error) {
-          console.error("Tutor question failed:", error);
-          set({
-            isAnswering: false,
-            tutorError: "Failed to get answer. Please try again.",
-          });
-        }
-      },
+  updateAgentStep: (stepNumber, updates) => {
+    set((state) => ({
+      agentSteps: state.agentSteps.map((s) =>
+        s.stepNumber === stepNumber ? { ...s, ...updates } : s,
+      ),
+    }));
+  },
 
-      clearConversation: (moduleId) => {
-        const state = get();
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { [moduleId]: _, ...rest } = state.moduleConversations;
-        set({ moduleConversations: rest, tutorError: null });
-      },
+  clearAgentSteps: () => set({ agentSteps: [] }),
 
-      // ── Agent steps ──
+  setAgentThinking: (agentThinking) => set({ agentThinking }),
 
-      addAgentStep: (step) => {
-        set((state) => ({
-          agentSteps: [
-            ...state.agentSteps,
-            { ...step, stepNumber: state.agentSteps.length + 1 },
-          ],
-        }));
-      },
+  // ── Streaming response ──
 
-      updateAgentStep: (stepNumber, updates) => {
-        set((state) => ({
-          agentSteps: state.agentSteps.map((s) =>
-            s.stepNumber === stepNumber ? { ...s, ...updates } : s,
-          ),
-        }));
-      },
+  appendResponseChunk: (chunk) => {
+    set((state) => ({ currentResponse: state.currentResponse + chunk }));
+  },
 
-      clearAgentSteps: () => set({ agentSteps: [] }),
+  addCitation: (citation) => {
+    set((state) => ({
+      currentCitations: [...state.currentCitations, citation],
+    }));
+  },
 
-      setAgentThinking: (agentThinking) => set({ agentThinking }),
+  addResponse: (response) => {
+    const state = get();
+    if (!state.currentSessionId) return;
 
-      // ── Streaming response ──
+    const fullResponse: AgentResponse = {
+      ...response,
+      id: uuid(),
+      createdAt: Date.now(),
+    };
 
-      appendResponseChunk: (chunk) => {
-        set((state) => ({ currentResponse: state.currentResponse + chunk }));
-      },
+    set({
+      sessions: sortByLastAccessed(
+        state.sessions.map((s) =>
+          s.id === state.currentSessionId
+            ? {
+                ...s,
+                responses: [...s.responses, fullResponse],
+                lastAccessed: Date.now(),
+              }
+            : s,
+        ),
+      ),
+      currentResponse: "",
+      currentCitations: [],
+    });
+  },
 
-      addCitation: (citation) => {
-        set((state) => ({
-          currentCitations: [...state.currentCitations, citation],
-        }));
-      },
+  clearCurrentResponse: () =>
+    set({ currentResponse: "", currentCitations: [] }),
 
-      addResponse: (response) => {
-        const state = get();
-        if (!state.currentSessionId) return;
+  // ── Source modal ──
 
-        const fullResponse: AgentResponse = {
-          ...response,
-          id: uuid(),
-          createdAt: Date.now(),
-        };
+  openSource: (citation, content, video) =>
+    set({ activeSource: { citation, content, video } }),
+  closeSource: () => set({ activeSource: null }),
 
-        set({
-          sessions: sortByLastAccessed(
-            updateSession(state.sessions, state.currentSessionId, (s) => ({
-              ...s,
-              responses: [...s.responses, fullResponse],
-              lastAccessed: Date.now(),
-            })),
-          ),
-          currentResponse: "",
-          currentCitations: [],
-        });
-      },
+  // ── UI ──
 
-      clearCurrentResponse: () =>
-        set({ currentResponse: "", currentCitations: [] }),
-
-      // ── Source modal ──
-
-      openSource: (citation, content, video) =>
-        set({ activeSource: { citation, content, video } }),
-      closeSource: () => set({ activeSource: null }),
-
-      // ── UI ──
-
-      setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
-    }),
-    {
-      name: "studyflow-storage",
-      partialize: (state) => ({
-        sessions: state.sessions,
-        currentSessionId: state.currentSessionId,
-        moduleConversations: state.moduleConversations,
-      }),
-    },
-  ),
-);
+  setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
+}));

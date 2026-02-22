@@ -1,6 +1,8 @@
-import { useState, useRef, useCallback, useMemo, lazy, Suspense } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, lazy, Suspense } from "react";
 import { toast } from "sonner";
 import { AnimatePresence } from "framer-motion";
+import { Share2, Loader2 } from "lucide-react";
+import { Button } from "./components/ui/button";
 import { Header } from "./components/layout/Header";
 import { Sidebar } from "./components/layout/Sidebar";
 import { InputBar, type InputBarRef } from "./components/layout/InputBar";
@@ -9,12 +11,14 @@ import { ModuleNavHorizontal } from "./components/learning/ModuleNavHorizontal";
 import { ContentTabs } from "./components/learning/ContentTabs";
 import { StudyAssistant } from "./components/learning/StudyAssistant";
 import { OrchestrationProgress } from "./components/learning/OrchestrationProgress";
-import { ResponseCard } from "./components/agent/ResponseCard";
 import { KeyboardShortcutsModal } from "./components/modals/KeyboardShortcutsModal";
 import { useStudyFlow } from "./hooks/useStudyFlow";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useSettingsStore } from "./lib/store/settingsStore";
+import { useAuth } from "./context/AuthContext";
+import { LoginPage } from "./components/auth/LoginPage";
 import { exportSession } from "./lib/export";
+import { shareOrGetSlug, buildShareUrl } from "./lib/db/sharedPaths";
 import type { VideoResource } from "./lib/api/types";
 
 // Lazy load heavy modals and pages
@@ -34,10 +38,54 @@ const SettingsPage = lazy(() =>
   })),
 );
 
+// Root component — handles auth gate only, no other hooks
 function App() {
+  const { user, loading: authLoading } = useAuth();
+
+  if (authLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center text-sm text-muted-foreground">
+        Loading...
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginPage />;
+  }
+
+  return <StudyApp />;
+}
+
+// Inner app — only rendered when authenticated, safe to call all hooks
+function StudyApp() {
   const [showSettings, setShowSettings] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [assistantWidth, setAssistantWidth] = useState(384); // px, matches w-96
   const inputRef = useRef<InputBarRef>(null);
+  const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!resizeRef.current) return;
+      const delta = resizeRef.current.startX - e.clientX;
+      setAssistantWidth(
+        Math.min(Math.max(resizeRef.current.startWidth + delta, 240), 640),
+      );
+    };
+    const onMouseUp = () => {
+      if (!resizeRef.current) return;
+      resizeRef.current = null;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+    return () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
+  }, []);
   const apiKey = useSettingsStore((s) => s.apiKey);
 
   const {
@@ -46,8 +94,6 @@ function App() {
     currentSessionId,
     sidebarOpen,
     agentThinking,
-    currentResponse,
-    currentCitations,
     activeSource,
     isOrchestrating,
     orchestrationStep,
@@ -66,6 +112,9 @@ function App() {
     tutorError,
     askTutorQuestion,
     clearConversation,
+    completedModuleIds,
+    toggleModuleComplete,
+    isLoadingPaths,
   } = useStudyFlow();
 
   const learningPath = currentSession?.learningPath ?? null;
@@ -142,6 +191,17 @@ function App() {
     [askTutorQuestion, apiKey],
   );
 
+  const handleShareSession = useCallback(async (sessionId: string) => {
+    try {
+      const slug = await shareOrGetSlug(sessionId);
+      const url = buildShareUrl(slug);
+      await navigator.clipboard.writeText(url);
+      toast.success("Link copied!", { description: url });
+    } catch {
+      toast.error("Failed to create share link");
+    }
+  }, []);
+
   useKeyboardShortcuts({
     onFocusInput: () => inputRef.current?.focus(),
     onExport: handleExport,
@@ -153,7 +213,7 @@ function App() {
   const showOrchestrating = isOrchestrating;
   const showLearningContent =
     !isOrchestrating && hasLearningPath && activeModule;
-  const showWelcome = !currentSession && !isOrchestrating;
+  const showWelcome = !isLoadingPaths && !currentSession && !isOrchestrating;
 
   return (
     <div className="flex h-screen flex-col">
@@ -211,7 +271,7 @@ function App() {
             ) : (
               <>
                 <div className="flex-1 overflow-y-auto">
-                  <div className="mx-auto max-w-4xl px-6 py-6 lg:px-8">
+                  <div className="mx-auto max-w-4xl px-6 py-6 pb-8 lg:px-8">
                     {showOrchestrating && (
                       <AnimatePresence>
                         <OrchestrationProgress step={orchestrationStep} />
@@ -220,11 +280,29 @@ function App() {
 
                     {showLearningContent && (
                       <>
-                        {/* Module navigation */}
+                        {/* Topic header with Share button */}
+                        <div className="mb-4 flex items-start justify-between gap-4">
+                          <h1 className="text-xl font-bold leading-tight tracking-tight text-foreground line-clamp-2">
+                            {learningPath!.topic}
+                          </h1>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="shrink-0 gap-1.5"
+                            onClick={() => currentSessionId && handleShareSession(currentSessionId)}
+                          >
+                            <Share2 className="h-3.5 w-3.5" />
+                            Share
+                          </Button>
+                        </div>
+
+                        {/* Module navigation + progress bar */}
                         <ModuleNavHorizontal
                           path={learningPath!}
                           activeModuleId={activeModuleId!}
+                          completedModuleIds={completedModuleIds}
                           onSelect={setActiveModule}
+                          onToggleComplete={toggleModuleComplete}
                         />
 
                         {/* Content tabs */}
@@ -235,41 +313,6 @@ function App() {
                             onWatchVideo={handleWatchVideo}
                           />
                         </div>
-
-                        {/* Q&A History */}
-                        {currentSession!.responses.length > 0 && (
-                          <div className="mt-8 space-y-4">
-                            <h3 className="text-sm font-medium text-muted-foreground">
-                              Questions & Answers
-                            </h3>
-                            {currentSession!.responses.map((response) => (
-                              <ResponseCard
-                                key={response.id}
-                                content={response.answer}
-                                query={response.query}
-                                citations={response.citations}
-                                timestamp={response.createdAt}
-                                onOpenSource={(citation) =>
-                                  openSource(citation, null)
-                                }
-                              />
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Streaming response */}
-                        {currentResponse && (
-                          <div className="mt-6">
-                            <ResponseCard
-                              content={currentResponse}
-                              citations={currentCitations}
-                              isStreaming={agentThinking}
-                              onOpenSource={(citation) =>
-                                openSource(citation, null)
-                              }
-                            />
-                          </div>
-                        )}
                       </>
                     )}
 
@@ -282,25 +325,50 @@ function App() {
                       </div>
                     )}
 
+                    {isLoadingPaths && (
+                      <div className="flex h-64 items-center justify-center">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      </div>
+                    )}
+
                     {showWelcome && (
                       <WelcomeScreen onSelectTopic={submitQuery} />
                     )}
                   </div>
                 </div>
 
-                <InputBar
-                  ref={inputRef}
-                  onSubmit={submitQuery}
-                  onStop={stopStream}
-                  isLoading={agentThinking || isOrchestrating}
-                />
+                {/* Input bar — only shown before a learning path is active */}
+                {!hasLearningPath && (
+                  <InputBar
+                    ref={inputRef}
+                    onSubmit={submitQuery}
+                    onStop={stopStream}
+                    isLoading={agentThinking || isOrchestrating}
+                  />
+                )}
               </>
             )}
           </main>
 
           {/* Right sidebar - Study Assistant (desktop only, when learning path active) */}
           {showLearningContent && !showSettings && (
-            <aside className="hidden w-96 flex-col border-l lg:flex">
+            <aside
+              className="relative hidden flex-col border-l lg:flex"
+              style={{ width: assistantWidth }}
+            >
+              {/* Drag handle on left edge */}
+              <div
+                className="absolute inset-y-0 left-0 z-10 w-1 cursor-col-resize transition-colors hover:bg-primary/30 active:bg-primary/50"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  resizeRef.current = {
+                    startX: e.clientX,
+                    startWidth: assistantWidth,
+                  };
+                  document.body.style.cursor = "col-resize";
+                  document.body.style.userSelect = "none";
+                }}
+              />
               <StudyAssistant
                 moduleId={activeModuleId!}
                 module={activeModule!}

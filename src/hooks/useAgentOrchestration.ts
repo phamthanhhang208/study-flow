@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { useStudyStore } from "../lib/store/studyStore";
 import { useSettingsStore } from "../lib/store/settingsStore";
 import { useAgentStream } from "./useAgentStream";
+import { useAuth } from "../context/AuthContext";
 import { buildLearningPath } from "../lib/api/learningPathOrchestrator";
 
 // ── Prompt templates ──
@@ -20,6 +21,7 @@ Question: ${question}`;
 export function useAgentOrchestration() {
   const store = useStudyStore();
   const apiKey = useSettingsStore((s) => s.apiKey);
+  const { user } = useAuth();
   const { streamQuery, stopStream } = useAgentStream();
 
   const handleUserInput = useCallback(
@@ -43,7 +45,7 @@ export function useAgentOrchestration() {
             apiKey || undefined,
           );
 
-          store.setLearningPath(path);
+          await store.setLearningPath(path, user?.id ?? "");
 
           if (path.subModules.length > 0) {
             store.setActiveModule(path.subModules[0].id);
@@ -104,7 +106,7 @@ export function useAgentOrchestration() {
         }
       }
     },
-    [store, streamQuery, apiKey],
+    [store, streamQuery, apiKey, user?.id],
   );
 
   return { handleUserInput, stopStream };

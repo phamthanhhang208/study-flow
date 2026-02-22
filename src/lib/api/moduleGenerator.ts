@@ -1,7 +1,7 @@
 import { getYouComClient } from "./youcom";
 import type { LLMModuleOutline } from "./types";
 
-const SYSTEM_PROMPT = `You are a curriculum designer. Break the following topic into 3-5 progressive learning sub-modules.
+const SYSTEM_PROMPT = `You are a curriculum designer. Break the following topic into progressive learning sub-modules.
 Return ONLY valid JSON with this structure:
 {
   "topic": string,
@@ -19,7 +19,13 @@ Return ONLY valid JSON with this structure:
     }
   ]
 }
-Rules: modules must be progressive, 3 minimum 5 maximum, return ONLY JSON no other text.`;
+Rules:
+- Number of modules should reflect the natural scope and complexity of the topic
+- Simple or narrow topics: 2-4 modules
+- Moderate topics: 4-6 modules
+- Broad or complex topics: 6-10 modules
+- Modules must be progressive (beginner → advanced)
+- Return ONLY JSON, no other text.`;
 
 const STRICT_PROMPT = `You are a curriculum designer. Break the following topic into 3-5 progressive learning sub-modules.
 You MUST return ONLY a valid JSON object. No markdown, no code fences, no explanation. Just raw JSON.
@@ -57,7 +63,9 @@ function validateOutline(data: unknown): LLMModuleOutline {
   if (typeof obj.overview !== "string" || !obj.overview) {
     throw new Error("Missing or invalid 'overview' field");
   }
-  if (!["beginner", "intermediate", "advanced"].includes(obj.difficulty as string)) {
+  if (
+    !["beginner", "intermediate", "advanced"].includes(obj.difficulty as string)
+  ) {
     throw new Error("Invalid 'difficulty' field");
   }
   if (typeof obj.estimatedTotalMinutes !== "number") {
@@ -66,17 +74,25 @@ function validateOutline(data: unknown): LLMModuleOutline {
 
   const modules = obj.modules;
   if (!Array.isArray(modules) || modules.length < 3 || modules.length > 5) {
-    throw new Error(`Expected 3-5 modules, got ${Array.isArray(modules) ? modules.length : 0}`);
+    throw new Error(
+      `Expected 3-5 modules, got ${Array.isArray(modules) ? modules.length : 0}`,
+    );
   }
 
   for (const mod of modules) {
     const m = mod as Record<string, unknown>;
     if (typeof m.order !== "number") throw new Error("Module missing 'order'");
-    if (typeof m.title !== "string" || !m.title) throw new Error("Module missing 'title'");
-    if (typeof m.description !== "string" || !m.description) throw new Error("Module missing 'description'");
-    if (typeof m.estimatedMinutes !== "number") throw new Error("Module missing 'estimatedMinutes'");
-    if (typeof m.searchQuery !== "string" || !m.searchQuery) throw new Error("Module missing 'searchQuery'");
-    if (!["beginner", "intermediate", "advanced"].includes(m.difficulty as string)) {
+    if (typeof m.title !== "string" || !m.title)
+      throw new Error("Module missing 'title'");
+    if (typeof m.description !== "string" || !m.description)
+      throw new Error("Module missing 'description'");
+    if (typeof m.estimatedMinutes !== "number")
+      throw new Error("Module missing 'estimatedMinutes'");
+    if (typeof m.searchQuery !== "string" || !m.searchQuery)
+      throw new Error("Module missing 'searchQuery'");
+    if (
+      !["beginner", "intermediate", "advanced"].includes(m.difficulty as string)
+    ) {
       throw new Error("Module has invalid 'difficulty'");
     }
   }
@@ -84,7 +100,11 @@ function validateOutline(data: unknown): LLMModuleOutline {
   return data as LLMModuleOutline;
 }
 
-async function callAgent(topic: string, prompt: string, apiKey?: string): Promise<string> {
+async function callAgent(
+  topic: string,
+  prompt: string,
+  apiKey?: string,
+): Promise<string> {
   const client = getYouComClient(apiKey);
   const input = `${prompt}\n\nTopic: ${topic}`;
 
@@ -111,7 +131,10 @@ export async function generateModuleOutline(
     const parsed = JSON.parse(cleaned);
     return validateOutline(parsed);
   } catch (firstError) {
-    console.warn("First module generation attempt failed, retrying with stricter prompt:", firstError);
+    console.warn(
+      "First module generation attempt failed, retrying with stricter prompt:",
+      firstError,
+    );
   }
 
   // Retry with stricter prompt

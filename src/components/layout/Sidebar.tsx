@@ -1,9 +1,10 @@
 import { useState, useMemo } from "react"
-import { Plus, Trash2, Search, X, PanelLeftClose, PanelLeft, AlertTriangle } from "lucide-react"
+import { Plus, Trash2, Search, X, PanelLeftClose, PanelLeft, AlertTriangle, LogOut } from "lucide-react"
 import { AnimatePresence, motion } from "framer-motion"
 import { Button } from "../ui/button"
 import { Input } from "../ui/input"
 import { Separator } from "../ui/separator"
+import { Avatar, AvatarImage, AvatarFallback } from "../ui/avatar"
 import {
   Dialog,
   DialogContent,
@@ -13,6 +14,7 @@ import {
   DialogFooter,
 } from "../ui/dialog"
 import { cn } from "../../lib/utils/cn"
+import { useAuth } from "../../context/AuthContext"
 import type { StudySession } from "../../lib/api/types"
 
 interface SidebarProps {
@@ -68,6 +70,7 @@ export function Sidebar({
 }: SidebarProps) {
   const [search, setSearch] = useState("")
   const [deleteTarget, setDeleteTarget] = useState<StudySession | null>(null)
+  const { user, signOut } = useAuth()
 
   const filtered = useMemo(() => {
     if (!search.trim()) return sessions
@@ -83,6 +86,15 @@ export function Sidebar({
       setDeleteTarget(null)
     }
   }
+
+  const avatarUrl = user?.user_metadata?.avatar_url as string | undefined
+  const fullName = user?.user_metadata?.full_name as string | undefined
+  const email = user?.email
+
+  // Initials fallback: first letter of name or email
+  const initials = fullName
+    ? fullName.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase()
+    : email?.[0]?.toUpperCase() ?? "?"
 
   return (
     <>
@@ -192,22 +204,22 @@ export function Sidebar({
                               {session.learningPath
                                 ? `${session.learningPath.subModules?.length ?? session.learningPath.totalModules} modules`
                                 : "New topic"}
-                              {session.responses.length > 0 &&
-                                ` · ${session.responses.length} Q&A`}
                             </p>
                           </button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="absolute right-1 top-1 h-6 w-6 opacity-0 transition-opacity group-hover:opacity-100"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setDeleteTarget(session)
-                            }}
-                            aria-label="Delete topic"
-                          >
-                            <Trash2 className="h-3 w-3 text-muted-foreground" />
-                          </Button>
+                          <div className="absolute right-1 top-1 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setDeleteTarget(session)
+                              }}
+                              aria-label="Delete topic"
+                            >
+                              <Trash2 className="h-3 w-3 text-muted-foreground" />
+                            </Button>
+                          </div>
                         </motion.div>
                       ))}
                     </AnimatePresence>
@@ -216,6 +228,32 @@ export function Sidebar({
               ))}
             </div>
           )}
+        </div>
+
+        {/* User profile footer */}
+        <Separator />
+        <div className="flex items-center gap-2.5 px-3 py-3">
+          <Avatar className="h-7 w-7 shrink-0">
+            <AvatarImage src={avatarUrl} alt={fullName ?? email ?? "User"} />
+            <AvatarFallback className="text-[11px]">{initials}</AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            {fullName && (
+              <p className="truncate text-xs font-semibold leading-tight">{fullName}</p>
+            )}
+            {email && (
+              <p className="truncate text-[10px] leading-tight text-muted-foreground">{email}</p>
+            )}
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+            onClick={signOut}
+            aria-label="Sign out"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+          </Button>
         </div>
       </aside>
 
