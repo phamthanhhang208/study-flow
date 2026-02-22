@@ -9,7 +9,7 @@ import { AuthProvider } from "./context/AuthContext";
 import ShareView from "./pages/ShareView";
 import "./index.css";
 import App from "./App.tsx";
-import { Analytics } from "@vercel/analytics/next";
+import { Analytics } from "@vercel/analytics/react";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
