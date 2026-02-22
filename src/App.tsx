@@ -289,7 +289,7 @@ function StudyApp() {
                             variant="outline"
                             size="sm"
                             className="shrink-0 gap-1.5"
-                            onClick={() => currentSessionId && handleShareSession(currentSessionId)}
+                            onClick={() => learningPath && handleShareSession(learningPath.id)}
                           >
                             <Share2 className="h-3.5 w-3.5" />
                             Share
