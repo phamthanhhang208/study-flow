@@ -1,135 +1,229 @@
 # StudyFlow
 
-AI-powered learning companion that researches topics, builds structured learning paths, and provides a context-aware tutor using the You.com API.
+An AI-powered learning companion that generates structured learning paths from any topic, with curated articles, videos, an interactive study assistant, and cloud sync.
 
-[Live Preview](https://study-flow-jgy7.vercel.app/)
+[**Live Demo**](https://study-flow-jgy7.vercel.app/)
 
 ## Features
 
-- **Learning Path Orchestration** — Enter any topic and get a structured learning path with 3-5 modules, each populated with curated articles and videos
-- **Module Navigation** — Horizontal scrollable module cards with active state, time estimates, and difficulty levels
-- **Deep Explanation** — Rich content view per module with article summaries, citation references, and key focus areas
-- **Media Resources** — Video grid with YouTube/Vimeo thumbnails, duration, and in-app playback
-- **Study Assistant** — Context-aware Q&A sidebar that knows your current module, maintains per-module conversation threads, and suggests follow-up questions
-- **Inline Citations** — Clickable citation badges in tutor responses linked to module resources
-- **Source Viewing** — Read articles and watch videos directly in-app with full-screen modals
-- **Export** — Download sessions and conversations as Markdown files
-- **Keyboard Shortcuts** — Cmd/Ctrl+K to focus input, Cmd/Ctrl+E to export, Cmd/Ctrl+N for new topic
+- **AI Learning Paths** — Enter any topic and get a structured curriculum with modules, estimated time, and difficulty rating
+- **Curated Resources** — Each module is automatically populated with relevant articles and videos
+- **Study Assistant** — Context-aware AI tutor for each module with per-module conversation threads and suggested follow-ups
+- **Progress Tracking** — Mark modules complete with a visual progress bar
+- **Shareable Paths** — Share any learning path via a public link; others can clone it to their own account
+- **Google Auth + Cloud Sync** — Sign in with Google; all paths and progress are saved to Supabase
+- **Source Viewer** — Read articles and watch videos in-app with full-screen modals
+- **Export** — Download sessions as Markdown files
 - **Dark Mode** — Light, dark, and system theme support
-- **Session Management** — Sidebar with date grouping, search, and session history
-- **Responsive Design** — 3-column layout on desktop (sidebar | content | study assistant), collapses on mobile
+- **Resizable Layout** — Drag the study assistant panel to your preferred width
 
 ## Tech Stack
 
-- **React 19** + TypeScript
-- **Vite** — Build tooling
-- **Tailwind CSS v3** + shadcn/ui design tokens
-- **Zustand** — State management with localStorage persistence
-- **Framer Motion** — Animations
-- **Sonner** — Toast notifications
-- **React Markdown** + Prism syntax highlighting
-- **Radix UI** — Tabs and other accessible primitives
+| Layer | Technology |
+|---|---|
+| Framework | React 19 + TypeScript + Vite |
+| Styling | Tailwind CSS v3 + shadcn/ui |
+| State | Zustand (Supabase is the persistence layer — no localStorage) |
+| Backend | Supabase (Auth, PostgreSQL, RLS) |
+| Routing | React Router v7 |
+| AI | Claude API (learning path generation + study assistant) |
+| Animations | Framer Motion |
+| Deployment | Vercel + Vercel Analytics |
 
-## You.com APIs Used
+## Getting Started
 
-| API | Endpoint | Purpose |
-|-----|----------|---------|
-| Search | `GET /search` | Web search for module resource enrichment |
-| Agent (non-streaming) | `POST /agents/runs` | Module outline generation and tutor Q&A |
-| Agent (streaming) | `POST /agents/runs` | Follow-up question streaming |
-| Contents | `POST /contents` | Fetch article content for in-app reading |
+### Prerequisites
 
-## Architecture
+- Node.js 18+
+- A [Supabase](https://supabase.com) project
+- An [Anthropic](https://console.anthropic.com) API key (entered in-app, never stored server-side)
 
-### Learning Path Pipeline
-
-1. **Module Generation** — LLM breaks topic into 3-5 structured sub-modules with titles, descriptions, search queries, and time estimates
-2. **Resource Fetching** — Parallel You.com Search API calls populate each module with articles and videos (general + video-focused searches)
-3. **Orchestration Progress** — Real-time step indicators during path creation
-
-### Study Assistant (Q&A Tutor)
-
-- Context-aware responses referencing current module content, articles, and videos
-- Per-module conversation threads persisted in localStorage
-- Suggested questions on empty conversations, follow-up suggestions from tutor
-- Inline citation parsing with clickable badges
-
-## Setup
-
-1. Clone the repository:
+### Install
 
 ```bash
 git clone https://github.com/phamthanhhang208/study-flow.git
 cd study-flow
-```
-
-2. Install dependencies:
-
-```bash
 npm install
 ```
 
-3. Set up your You.com API key. Either:
-   - Create a `.env` file with `VITE_YOUCOM_API_KEY=your_key_here`
-   - Or enter it in the Settings page within the app
+### Environment Variables
 
-4. Start the development server:
+Create a `.env` file at the project root:
+
+```env
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+```
+
+### Run
 
 ```bash
 npm run dev
 ```
 
-5. Open [http://localhost:5173](http://localhost:5173) in your browser.
+Open [http://localhost:5173](http://localhost:5173).
 
-## Build
+### Build
 
 ```bash
 npm run build
 ```
 
-Output is in the `dist/` directory.
+## Database Setup
 
-## Keyboard Shortcuts
+Run the following SQL in your Supabase SQL editor.
 
-| Shortcut | Action |
-|----------|--------|
-| `Cmd/Ctrl + K` | Focus input |
-| `Cmd/Ctrl + E` | Export session |
-| `Cmd/Ctrl + N` | New topic |
-| `Cmd/Ctrl + /` | Show shortcuts help |
-| `Escape` | Close modals |
-| `Enter` | Send message |
-| `Shift + Enter` | New line |
+<details>
+<summary><strong>learning_paths</strong></summary>
+
+```sql
+create table learning_paths (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade not null,
+  topic text not null,
+  title text,
+  overview text,
+  difficulty text,
+  estimated_total_minutes integer,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table learning_paths enable row level security;
+
+create policy "Users own their paths"
+  on learning_paths for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create policy "Public can read shared paths"
+  on learning_paths for select
+  using (id in (select path_id from shared_paths));
+```
+</details>
+
+<details>
+<summary><strong>modules</strong></summary>
+
+```sql
+create table modules (
+  id uuid primary key default gen_random_uuid(),
+  path_id uuid references learning_paths(id) on delete cascade not null,
+  title text not null,
+  description text,
+  order_index integer not null,
+  estimated_minutes integer,
+  search_query text,
+  difficulty text,
+  module_status text default 'complete',
+  resources jsonb,
+  created_at timestamptz default now()
+);
+
+alter table modules enable row level security;
+
+create policy "Users own their modules"
+  on modules for all
+  using (path_id in (select id from learning_paths where user_id = auth.uid()))
+  with check (path_id in (select id from learning_paths where user_id = auth.uid()));
+
+create policy "Public can view modules of shared paths"
+  on modules for select
+  using (path_id in (select path_id from shared_paths));
+```
+</details>
+
+<details>
+<summary><strong>module_progress</strong></summary>
+
+```sql
+create table module_progress (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade not null,
+  module_id uuid references modules(id) on delete cascade not null,
+  completed_at timestamptz,
+  unique(user_id, module_id)
+);
+
+alter table module_progress enable row level security;
+
+create policy "Users own their progress"
+  on module_progress for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+```
+</details>
+
+<details>
+<summary><strong>shared_paths</strong></summary>
+
+```sql
+create table shared_paths (
+  id uuid primary key default gen_random_uuid(),
+  path_id uuid references learning_paths(id) on delete cascade not null,
+  user_id uuid references auth.users(id) not null,
+  slug text unique not null default substr(md5(random()::text), 1, 10),
+  created_at timestamptz default now()
+);
+
+alter table shared_paths enable row level security;
+
+-- Unconditional SELECT is required to avoid RLS recursion with learning_paths
+create policy "Public can read shared_paths"
+  on shared_paths for select
+  using (true);
+
+create policy "Owner manages shared paths"
+  on shared_paths for all
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+```
+</details>
+
+### Google OAuth
+
+1. In Supabase → Authentication → Providers, enable **Google**
+2. Add credentials from [Google Cloud Console](https://console.cloud.google.com)
+3. Add your site URL to the allowed redirect URLs in Supabase
 
 ## Project Structure
 
 ```
 src/
 ├── components/
-│   ├── agent/          # ResponseCard, MarkdownRenderer, CitationCard
+│   ├── auth/           # LoginPage (Google OAuth gate)
 │   ├── layout/         # Header, Sidebar, InputBar, WelcomeScreen
-│   ├── learning/       # ModuleNavHorizontal, ContentTabs, DeepExplanation,
-│   │                   # MediaResourcesGrid, StudyAssistant, MessageBubble,
-│   │                   # OrchestrationProgress, SessionCard
+│   ├── learning/       # ModuleNavHorizontal, ContentTabs, StudyAssistant,
+│   │                   # OrchestrationProgress
 │   ├── modals/         # SourceReaderModal, VideoPlayerModal, KeyboardShortcutsModal
-│   ├── ui/             # shadcn/ui primitives (button, card, dialog, tabs, etc.)
+│   ├── ui/             # shadcn/ui primitives
 │   ├── ErrorBoundary.tsx
 │   └── SettingsPage.tsx
+├── context/
+│   └── AuthContext.tsx
 ├── hooks/
-│   ├── useStudyFlow.ts         # Main app hook
-│   ├── useAgentOrchestration.ts # Topic/question orchestration
-│   ├── useAgentStream.ts       # SSE streaming
-│   └── useKeyboardShortcuts.ts # Global keyboard shortcuts
+│   ├── useStudyFlow.ts           # Main app hook
+│   ├── useAgentOrchestration.ts  # Topic + question orchestration
+│   └── useKeyboardShortcuts.ts
 ├── lib/
-│   ├── api/            # You.com client, types, error classes,
-│   │                   # moduleGenerator, resourceFetcher,
-│   │                   # learningPathOrchestrator, tutorAgent
-│   ├── store/          # Zustand stores (study, settings)
-│   ├── utils/          # cn, video detection
-│   ├── export.ts       # Markdown export (sessions + conversations)
-│   └── query.ts        # React Query client
+│   ├── api/            # Claude agents (moduleGenerator, tutorAgent, types)
+│   ├── db/             # Supabase data layer (learningPaths, moduleProgress, sharedPaths)
+│   ├── store/          # Zustand stores (studyStore, settingsStore)
+│   └── utils/
+├── pages/
+│   └── ShareView.tsx   # Public read-only shared path + clone flow
 └── App.tsx
 ```
+
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+|---|---|
+| `/` | Focus input |
+| `N` | New topic |
+| `E` | Export session |
+| `?` | Toggle shortcuts help |
+| `Escape` | Close modals |
 
 ## License
 
