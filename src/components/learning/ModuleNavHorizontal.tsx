@@ -1,13 +1,15 @@
 import { useEffect, useRef } from "react"
-import { Clock, Circle, CheckCircle2 } from "lucide-react"
+import { Clock, Circle, CheckCircle2, Trophy } from "lucide-react"
 import { cn } from "../../lib/utils/cn"
 import { Progress } from "../ui/progress"
 import type { LearningPath } from "../../lib/api/types"
+import type { QuizAttempt } from "../../lib/store/studyStore"
 
 interface ModuleNavHorizontalProps {
   path: LearningPath
   activeModuleId: string
   completedModuleIds: Set<string>
+  quizAttempts?: Record<string, QuizAttempt[]>
   onSelect: (id: string) => void
   onToggleComplete: (moduleId: string) => void
 }
@@ -16,6 +18,7 @@ export function ModuleNavHorizontal({
   path,
   activeModuleId,
   completedModuleIds,
+  quizAttempts = {},
   onSelect,
   onToggleComplete,
 }: ModuleNavHorizontalProps) {
@@ -59,6 +62,9 @@ export function ModuleNavHorizontal({
         {path.subModules.map((mod) => {
           const isActive = mod.id === activeModuleId
           const isComplete = completedModuleIds.has(mod.id)
+          const attempts = quizAttempts[mod.id] ?? []
+          const bestAttempt = attempts[0]
+          const quizPassed = bestAttempt && bestAttempt.score / bestAttempt.total >= 0.8
           return (
             <button
               key={mod.id}
@@ -75,7 +81,7 @@ export function ModuleNavHorizontal({
                   : "border-border hover:border-blue-300 hover:bg-accent/50",
               )}
             >
-              {/* Top row: module label + time */}
+              {/* Top row: module label + trophy + time */}
               <div className="flex items-start justify-between gap-2">
                 <span
                   className={cn(
@@ -89,6 +95,13 @@ export function ModuleNavHorizontal({
                 >
                   Module {mod.order}
                 </span>
+                <div className="flex shrink-0 items-center gap-1">
+                  {quizPassed && (
+                    <Trophy
+                      className="h-3.5 w-3.5 text-yellow-500"
+                      title={`Quiz passed: ${bestAttempt.score}/${bestAttempt.total}`}
+                    />
+                  )}
                 <span
                   className={cn(
                     "flex shrink-0 items-center gap-1 text-xs",
@@ -98,6 +111,7 @@ export function ModuleNavHorizontal({
                   <Clock className="h-3 w-3" />
                   {mod.estimatedMinutes} min
                 </span>
+                </div>
               </div>
 
               {/* Title */}

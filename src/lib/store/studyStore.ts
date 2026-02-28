@@ -13,6 +13,8 @@ import type {
   TutorContext,
 } from "../api/types";
 import { askTutorQuestion } from "../api/tutorAgent";
+import { generateQuiz } from "../api/quizGenerator";
+import type { Quiz } from "../api/quizGenerator";
 import {
   fetchUserPaths,
   saveLearningPath,
@@ -23,6 +25,22 @@ import {
   markModuleComplete,
   unmarkModuleComplete,
 } from "../db/moduleProgress";
+import { supabase } from "../supabase";
+
+// ── Quiz answer record ──
+export interface AnswerRecord {
+  questionId: number;
+  correct: boolean;
+}
+
+export interface QuizAttempt {
+  id?: string;
+  moduleId: string;
+  score: number;
+  total: number;
+  answers: AnswerRecord[];
+  completedAt: string;
+}
 
 function uuid(): string {
   return crypto.randomUUID();
@@ -71,6 +89,15 @@ interface StudyState {
   setActiveModule: (moduleId: string) => void;
   setOrchestrating: (status: boolean) => void;
   setOrchestrationStep: (step: OrchestrationStep) => void;
+
+  // Quiz
+  quizzes: Record<string, Quiz>;
+  quizAttempts: Record<string, QuizAttempt[]>;
+  isGeneratingQuiz: boolean;
+  quizError: string | null;
+  generateQuizForModule: (moduleId: string, moduleTitle: string, moduleContent: string, apiKey?: string) => Promise<void>;
+  saveQuizAttempt: (moduleId: string, score: number, total: number, answers: AnswerRecord[]) => Promise<void>;
+  loadQuizAttempts: (moduleId: string) => Promise<void>;
 
   // Q&A tutor
   askTutorQuestion: (question: string, apiKey?: string) => Promise<void>;
@@ -134,6 +161,10 @@ export const useStudyStore = create<StudyState>()((set, get) => ({
   moduleConversations: {},
   isAnswering: false,
   tutorError: null,
+  quizzes: {},
+  quizAttempts: {},
+  isGeneratingQuiz: false,
+  quizError: null,
 
   // ── Cloud sync ──
 
@@ -384,6 +415,79 @@ export const useStudyStore = create<StudyState>()((set, get) => ({
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { [moduleId]: _, ...rest } = state.moduleConversations;
     set({ moduleConversations: rest, tutorError: null });
+  },
+
+  // ── Quiz ──
+
+  generateQuizForModule: async (moduleId, moduleTitle, moduleContent, apiKey) => {
+    set({ isGeneratingQuiz: true, quizError: null });
+    try {
+      const quiz = await generateQuiz({ id: moduleId, title: moduleTitle, content: moduleContent }, apiKey);
+      set((state) => ({
+        quizzes: { ...state.quizzes, [moduleId]: quiz },
+        isGeneratingQuiz: false,
+      }));
+    } catch (err) {
+      console.error("generateQuizForModule failed:", err);
+      set({ isGeneratingQuiz: false, quizError: "Failed to generate quiz. Please try again." });
+    }
+  },
+
+  saveQuizAttempt: async (moduleId, score, total, answers) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const attempt: QuizAttempt = {
+      moduleId,
+      score,
+      total,
+      answers,
+      completedAt: new Date().toISOString(),
+    };
+
+    const { data } = await supabase.from("quiz_attempts").insert({
+      user_id: user.id,
+      module_id: moduleId,
+      score,
+      total,
+      answers,
+    }).select("id").single();
+
+    if (data) attempt.id = data.id;
+
+    set((state) => ({
+      quizAttempts: {
+        ...state.quizAttempts,
+        [moduleId]: [...(state.quizAttempts[moduleId] ?? []), attempt],
+      },
+    }));
+  },
+
+  loadQuizAttempts: async (moduleId) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data } = await supabase
+      .from("quiz_attempts")
+      .select("id, score, total, answers, completed_at")
+      .eq("user_id", user.id)
+      .eq("module_id", moduleId)
+      .order("completed_at", { ascending: false });
+
+    if (!data) return;
+
+    const attempts: QuizAttempt[] = data.map((row) => ({
+      id: row.id,
+      moduleId,
+      score: row.score,
+      total: row.total,
+      answers: row.answers as AnswerRecord[],
+      completedAt: row.completed_at,
+    }));
+
+    set((state) => ({
+      quizAttempts: { ...state.quizAttempts, [moduleId]: attempts },
+    }));
   },
 
   // ── Agent steps ──

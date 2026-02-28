@@ -43,6 +43,15 @@ export function useStudyFlow() {
     completedModuleIds: store.completedModuleIds,
     toggleModuleComplete: store.toggleModuleComplete,
 
+    // Quiz
+    quizzes: store.quizzes,
+    quizAttempts: store.quizAttempts,
+    isGeneratingQuiz: store.isGeneratingQuiz,
+    quizError: store.quizError,
+    generateQuizForModule: store.generateQuizForModule,
+    saveQuizAttempt: store.saveQuizAttempt,
+    loadQuizAttempts: store.loadQuizAttempts,
+
     // Q&A tutor
     moduleConversations: store.moduleConversations,
     isAnswering: store.isAnswering,

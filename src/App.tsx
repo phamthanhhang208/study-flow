@@ -115,6 +115,12 @@ function StudyApp() {
     completedModuleIds,
     toggleModuleComplete,
     isLoadingPaths,
+    quizzes,
+    quizAttempts,
+    isGeneratingQuiz,
+    generateQuizForModule,
+    saveQuizAttempt,
+    loadQuizAttempts,
   } = useStudyFlow();
 
   const learningPath = currentSession?.learningPath ?? null;
@@ -201,6 +207,25 @@ function StudyApp() {
       toast.error("Failed to create share link");
     }
   }, []);
+
+  const handleStartQuiz = useCallback(() => {
+    if (!activeModuleId || !activeModule) return;
+    generateQuizForModule(
+      activeModuleId,
+      activeModule.title,
+      activeModule.description,
+      apiKey || undefined,
+    );
+    loadQuizAttempts(activeModuleId);
+  }, [activeModuleId, activeModule, generateQuizForModule, loadQuizAttempts, apiKey]);
+
+  const handleCompleteQuiz = useCallback(
+    (score: number, total: number, answers: import("./lib/store/studyStore").AnswerRecord[]) => {
+      if (!activeModuleId) return;
+      saveQuizAttempt(activeModuleId, score, total, answers);
+    },
+    [activeModuleId, saveQuizAttempt],
+  );
 
   useKeyboardShortcuts({
     onFocusInput: () => inputRef.current?.focus(),
@@ -301,6 +326,7 @@ function StudyApp() {
                           path={learningPath!}
                           activeModuleId={activeModuleId!}
                           completedModuleIds={completedModuleIds}
+                          quizAttempts={quizAttempts}
                           onSelect={setActiveModule}
                           onToggleComplete={toggleModuleComplete}
                         />
@@ -311,6 +337,11 @@ function StudyApp() {
                             module={activeModule}
                             citations={moduleCitations}
                             onWatchVideo={handleWatchVideo}
+                            quiz={quizzes[activeModuleId!] ?? null}
+                            isGeneratingQuiz={isGeneratingQuiz}
+                            bestAttempt={quizAttempts[activeModuleId!]?.[0]}
+                            onStartQuiz={handleStartQuiz}
+                            onCompleteQuiz={handleCompleteQuiz}
                           />
                         </div>
                       </>
