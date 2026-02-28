@@ -1,42 +1,55 @@
-import { useState } from "react"
-import { Brain, Trophy, ChevronRight, RotateCcw, CheckCircle2, XCircle, Loader2 } from "lucide-react"
-import { cn } from "../../lib/utils/cn"
-import { Progress } from "../ui/progress"
-import { Button } from "../ui/button"
-import type { Question, Quiz, MultipleChoiceQuestion, TrueFalseQuestion, FillBlankQuestion } from "../../lib/api/quizGenerator"
+import { useState } from "react";
+import {
+  Brain,
+  Trophy,
+  ChevronRight,
+  RotateCcw,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+} from "lucide-react";
+import { cn } from "../../lib/utils/cn";
+import { Progress } from "../ui/progress";
+import { Button } from "../ui/button";
+import type {
+  Quiz,
+  MultipleChoiceQuestion,
+  FillBlankQuestion,
+} from "../../lib/api/quizGenerator";
 
 // ── Types ──
 
-type QuizStatus = "idle" | "loading" | "active" | "completed"
+type QuizStatus = "idle" | "loading" | "active" | "completed";
 
 interface AnswerRecord {
-  questionId: number
-  correct: boolean
+  questionId: number;
+  correct: boolean;
 }
 
 interface BestAttempt {
-  score: number
-  total: number
+  score: number;
+  total: number;
 }
 
 interface KnowledgeCheckProps {
-  moduleId: string
-  moduleTitle: string
-  moduleContent: string
-  quiz: Quiz | null
-  isGenerating: boolean
-  bestAttempt?: BestAttempt
-  onStart: () => void
-  onComplete: (score: number, total: number, answers: AnswerRecord[]) => void
+  moduleId: string;
+  moduleTitle: string;
+  moduleContent: string;
+  quiz: Quiz | null;
+  isGenerating: boolean;
+  bestAttempt?: BestAttempt;
+  onStart: () => void;
+  onComplete: (score: number, total: number, answers: AnswerRecord[]) => void;
 }
 
 // ── Score message ──
 
 function scoreMessage(pct: number): string {
-  if (pct === 100) return "Perfect score! Outstanding work. 🎉"
-  if (pct >= 80) return "Great job! You're ready to move on."
-  if (pct >= 60) return "Good effort! Consider reviewing the module before continuing."
-  return "Keep studying — retake this quiz when you're ready."
+  if (pct === 100) return "Perfect score! Outstanding work. 🎉";
+  if (pct >= 80) return "Great job! You're ready to move on.";
+  if (pct >= 60)
+    return "Good effort! Consider reviewing the module before continuing.";
+  return "Keep studying — retake this quiz when you're ready.";
 }
 
 // ── Multiple choice input ──
@@ -47,32 +60,35 @@ function MultipleChoiceInput({
   isRevealed,
   onSelect,
 }: {
-  question: MultipleChoiceQuestion
-  selected: number | null
-  isRevealed: boolean
-  onSelect: (i: number) => void
+  question: MultipleChoiceQuestion;
+  selected: number | null;
+  isRevealed: boolean;
+  onSelect: (i: number) => void;
 }) {
   return (
     <div className="space-y-2">
       {question.options.map((opt, i) => {
-        const isSelected = selected === i
-        const isCorrect = i === question.correctIndex
+        const isSelected = selected === i;
+        const isCorrect = i === question.correctIndex;
 
-        let style = "border-border bg-background hover:border-primary/50 hover:bg-accent/50"
-        let icon: React.ReactNode = null
+        let style =
+          "border-border bg-background hover:border-primary/50 hover:bg-accent/50";
+        let icon: React.ReactNode = null;
 
         if (isRevealed) {
           if (isCorrect) {
-            style = "border-green-500 bg-green-50 dark:bg-green-950/30 cursor-default"
-            icon = <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" />
+            style =
+              "border-green-500 bg-green-50 dark:bg-green-950/30 cursor-default";
+            icon = <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" />;
           } else if (isSelected) {
-            style = "border-red-400 bg-red-50 dark:bg-red-950/30 cursor-default"
-            icon = <XCircle className="h-4 w-4 shrink-0 text-red-500" />
+            style =
+              "border-red-400 bg-red-50 dark:bg-red-950/30 cursor-default";
+            icon = <XCircle className="h-4 w-4 shrink-0 text-red-500" />;
           } else {
-            style = "border-border bg-background opacity-50 cursor-default"
+            style = "border-border bg-background opacity-50 cursor-default";
           }
         } else if (isSelected) {
-          style = "border-primary bg-primary/5"
+          style = "border-primary bg-primary/5";
         }
 
         return (
@@ -86,25 +102,27 @@ function MultipleChoiceInput({
               style,
             )}
           >
-            <span className={cn(
-              "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-semibold",
-              isRevealed && isCorrect
-                ? "border-green-500 text-green-600"
-                : isRevealed && isSelected
-                ? "border-red-400 text-red-500"
-                : isSelected
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-muted-foreground/40 text-muted-foreground",
-            )}>
+            <span
+              className={cn(
+                "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-semibold",
+                isRevealed && isCorrect
+                  ? "border-green-500 text-green-600"
+                  : isRevealed && isSelected
+                    ? "border-red-400 text-red-500"
+                    : isSelected
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-muted-foreground/40 text-muted-foreground",
+              )}
+            >
               {String.fromCharCode(65 + i)}
             </span>
             <span className="flex-1">{opt}</span>
             {icon}
           </button>
-        )
+        );
       })}
     </div>
-  )
+  );
 }
 
 // ── True / False input ──
@@ -115,37 +133,39 @@ function TrueFalseInput({
   correct,
   onSelect,
 }: {
-  selected: boolean | null
-  isRevealed: boolean
-  correct: boolean
-  onSelect: (v: boolean) => void
+  selected: boolean | null;
+  isRevealed: boolean;
+  correct: boolean;
+  onSelect: (v: boolean) => void;
 }) {
   const options: { value: boolean; label: string }[] = [
     { value: true, label: "True" },
     { value: false, label: "False" },
-  ]
+  ];
 
   return (
     <div className="flex gap-4">
       {options.map(({ value, label }) => {
-        const isSelected = selected === value
-        const isCorrect = value === correct
+        const isSelected = selected === value;
+        const isCorrect = value === correct;
 
-        let style = "border-border hover:border-primary/50 hover:bg-accent/50"
-        let icon: React.ReactNode = null
+        let style = "border-border hover:border-primary/50 hover:bg-accent/50";
+        let icon: React.ReactNode = null;
 
         if (isRevealed) {
           if (isCorrect) {
-            style = "border-green-500 bg-green-50 dark:bg-green-950/30 cursor-default"
-            icon = <CheckCircle2 className="h-5 w-5 text-green-600" />
+            style =
+              "border-green-500 bg-green-50 dark:bg-green-950/30 cursor-default";
+            icon = <CheckCircle2 className="h-5 w-5 text-green-600" />;
           } else if (isSelected) {
-            style = "border-red-400 bg-red-50 dark:bg-red-950/30 cursor-default"
-            icon = <XCircle className="h-5 w-5 text-red-500" />
+            style =
+              "border-red-400 bg-red-50 dark:bg-red-950/30 cursor-default";
+            icon = <XCircle className="h-5 w-5 text-red-500" />;
           } else {
-            style = "border-border opacity-50 cursor-default"
+            style = "border-border opacity-50 cursor-default";
           }
         } else if (isSelected) {
-          style = "border-primary bg-primary/5"
+          style = "border-primary bg-primary/5";
         }
 
         return (
@@ -162,10 +182,10 @@ function TrueFalseInput({
             {label}
             {icon}
           </button>
-        )
+        );
       })}
     </div>
-  )
+  );
 }
 
 // ── Fill in the blank input ──
@@ -177,13 +197,13 @@ function FillBlankInput({
   isCorrect,
   onChange,
 }: {
-  question: FillBlankQuestion
-  value: string
-  isRevealed: boolean
-  isCorrect: boolean | null
-  onChange: (v: string) => void
+  question: FillBlankQuestion;
+  value: string;
+  isRevealed: boolean;
+  isCorrect: boolean | null;
+  onChange: (v: string) => void;
 }) {
-  const parts = question.question.split("___")
+  const parts = question.question.split("___");
 
   return (
     <div className="space-y-3">
@@ -203,8 +223,8 @@ function FillBlankInput({
                   isRevealed && isCorrect === true
                     ? "border-green-500 text-green-700 dark:text-green-400"
                     : isRevealed && isCorrect === false
-                    ? "border-red-400 text-red-600"
-                    : "border-primary/50 focus:border-primary",
+                      ? "border-red-400 text-red-600"
+                      : "border-primary/50 focus:border-primary",
                 )}
               />
             )}
@@ -218,7 +238,7 @@ function FillBlankInput({
         </p>
       )}
     </div>
-  )
+  );
 }
 
 // ── Explanation box ──
@@ -226,10 +246,12 @@ function FillBlankInput({
 function ExplanationBox({ text }: { text: string }) {
   return (
     <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-800 dark:bg-blue-950/30">
-      <p className="text-sm font-medium text-blue-800 dark:text-blue-300">Explanation</p>
+      <p className="text-sm font-medium text-blue-800 dark:text-blue-300">
+        Explanation
+      </p>
       <p className="mt-1 text-sm text-blue-700 dark:text-blue-400">{text}</p>
     </div>
-  )
+  );
 }
 
 // ── Main component ──
@@ -242,104 +264,104 @@ export function KnowledgeCheck({
   onStart,
   onComplete,
 }: KnowledgeCheckProps) {
-  const [status, setStatus] = useState<QuizStatus>("idle")
-  const [currentIndex, setCurrentIndex] = useState(0)
-  const [answers, setAnswers] = useState<AnswerRecord[]>([])
-  const [isRevealed, setIsRevealed] = useState(false)
+  const [status, setStatus] = useState<QuizStatus>("idle");
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [answers, setAnswers] = useState<AnswerRecord[]>([]);
+  const [isRevealed, setIsRevealed] = useState(false);
 
   // Per-question answer state (typed loosely, narrowed in handlers)
-  const [mcSelected, setMcSelected] = useState<number | null>(null)
-  const [tfSelected, setTfSelected] = useState<boolean | null>(null)
-  const [fillValue, setFillValue] = useState("")
-  const [fillCorrect, setFillCorrect] = useState<boolean | null>(null)
+  const [mcSelected, setMcSelected] = useState<number | null>(null);
+  const [tfSelected, setTfSelected] = useState<boolean | null>(null);
+  const [fillValue, setFillValue] = useState("");
+  const [fillCorrect, setFillCorrect] = useState<boolean | null>(null);
 
-  const questions = quiz?.questions ?? []
-  const currentQ = questions[currentIndex]
-  const isLastQuestion = currentIndex === questions.length - 1
+  const questions = quiz?.questions ?? [];
+  const currentQ = questions[currentIndex];
+  const isLastQuestion = currentIndex === questions.length - 1;
 
   // ── Start ──
 
   function handleStart() {
-    setStatus("loading")
-    setCurrentIndex(0)
-    setAnswers([])
-    resetQuestionState()
-    onStart()
+    setStatus("loading");
+    setCurrentIndex(0);
+    setAnswers([]);
+    resetQuestionState();
+    onStart();
   }
 
   function resetQuestionState() {
-    setMcSelected(null)
-    setTfSelected(null)
-    setFillValue("")
-    setFillCorrect(null)
-    setIsRevealed(false)
+    setMcSelected(null);
+    setTfSelected(null);
+    setFillValue("");
+    setFillCorrect(null);
+    setIsRevealed(false);
   }
 
   // When the quiz finishes generating, move to active
   if (status === "loading" && quiz && !isGenerating) {
-    setStatus("active")
+    setStatus("active");
   }
 
   // ── Check answer ──
 
   function handleCheckAnswer() {
-    if (!currentQ) return
+    if (!currentQ) return;
 
-    let correct = false
+    let correct = false;
 
     if (currentQ.type === "multiple_choice") {
-      correct = mcSelected === currentQ.correctIndex
+      correct = mcSelected === currentQ.correctIndex;
     } else if (currentQ.type === "true_false") {
-      correct = tfSelected === currentQ.correct
+      correct = tfSelected === currentQ.correct;
     } else if (currentQ.type === "fill_blank") {
-      const normalised = fillValue.trim().toLowerCase()
+      const normalised = fillValue.trim().toLowerCase();
       const accepted = [currentQ.answer, ...currentQ.acceptedAnswers].map((a) =>
         a.toLowerCase(),
-      )
-      correct = accepted.includes(normalised)
-      setFillCorrect(correct)
+      );
+      correct = accepted.includes(normalised);
+      setFillCorrect(correct);
     }
 
-    setIsRevealed(true)
-    setAnswers((prev) => [...prev, { questionId: currentQ.id, correct }])
+    setIsRevealed(true);
+    setAnswers((prev) => [...prev, { questionId: currentQ.id, correct }]);
   }
 
   // ── Next / complete ──
 
   function handleNext() {
     if (isLastQuestion) {
-      const score = answers.filter((a) => a.correct).length
-      setStatus("completed")
-      onComplete(score, questions.length, answers)
+      const score = answers.filter((a) => a.correct).length;
+      setStatus("completed");
+      onComplete(score, questions.length, answers);
     } else {
-      setCurrentIndex((i) => i + 1)
-      resetQuestionState()
+      setCurrentIndex((i) => i + 1);
+      resetQuestionState();
     }
   }
 
   // ── Retry ──
 
   function handleRetry() {
-    setStatus("idle")
-    setCurrentIndex(0)
-    setAnswers([])
-    resetQuestionState()
+    setStatus("idle");
+    setCurrentIndex(0);
+    setAnswers([]);
+    resetQuestionState();
   }
 
   // ── Can check answer? ──
 
   const canCheck = (() => {
-    if (!currentQ || isRevealed) return false
-    if (currentQ.type === "multiple_choice") return mcSelected !== null
-    if (currentQ.type === "true_false") return tfSelected !== null
-    if (currentQ.type === "fill_blank") return fillValue.trim().length > 0
-    return false
-  })()
+    if (!currentQ || isRevealed) return false;
+    if (currentQ.type === "multiple_choice") return mcSelected !== null;
+    if (currentQ.type === "true_false") return tfSelected !== null;
+    if (currentQ.type === "fill_blank") return fillValue.trim().length > 0;
+    return false;
+  })();
 
   // ── Completed score ──
-  const finalScore = answers.filter((a) => a.correct).length
-  const finalTotal = questions.length
-  const pct = finalTotal > 0 ? Math.round((finalScore / finalTotal) * 100) : 0
+  const finalScore = answers.filter((a) => a.correct).length;
+  const finalTotal = questions.length;
+  const pct = finalTotal > 0 ? Math.round((finalScore / finalTotal) * 100) : 0;
 
   // ── Render: Idle ──
 
@@ -351,7 +373,8 @@ export function KnowledgeCheck({
         </div>
         <h3 className="text-lg font-semibold">Knowledge Check</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Test your understanding of <span className="font-medium text-foreground">{moduleTitle}</span>
+          Test your understanding of{" "}
+          <span className="font-medium text-foreground">{moduleTitle}</span>
         </p>
 
         <ul className="mt-4 space-y-1 text-sm text-muted-foreground">
@@ -373,7 +396,7 @@ export function KnowledgeCheck({
           Start Knowledge Check
         </Button>
       </div>
-    )
+    );
   }
 
   // ── Render: Loading ──
@@ -382,9 +405,11 @@ export function KnowledgeCheck({
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <Loader2 className="mb-3 h-8 w-8 animate-spin text-primary" />
-        <p className="text-sm font-medium text-muted-foreground">Generating your quiz…</p>
+        <p className="text-sm font-medium text-muted-foreground">
+          Generating your quiz…
+        </p>
       </div>
-    )
+    );
   }
 
   // ── Render: Completed ──
@@ -392,16 +417,20 @@ export function KnowledgeCheck({
   if (status === "completed") {
     return (
       <div className="flex flex-col items-center justify-center py-10 text-center">
-        <Trophy className={cn(
-          "mb-4 h-14 w-14",
-          pct >= 80 ? "text-yellow-500" : "text-muted-foreground",
-        )} />
+        <Trophy
+          className={cn(
+            "mb-4 h-14 w-14",
+            pct >= 80 ? "text-yellow-500" : "text-muted-foreground",
+          )}
+        />
         <h3 className="text-xl font-bold">Quiz Completed!</h3>
         <p className="mt-2 text-4xl font-semibold tabular-nums">
           {finalScore}
           <span className="text-xl text-muted-foreground"> / {finalTotal}</span>
         </p>
-        <p className="mt-3 text-sm text-muted-foreground">{scoreMessage(pct)}</p>
+        <p className="mt-3 text-sm text-muted-foreground">
+          {scoreMessage(pct)}
+        </p>
 
         <div className="mt-6 flex gap-3">
           <Button variant="outline" onClick={handleRetry}>
@@ -410,23 +439,26 @@ export function KnowledgeCheck({
           </Button>
         </div>
       </div>
-    )
+    );
   }
 
   // ── Render: Active ──
 
-  if (!currentQ) return null
+  if (!currentQ) return null;
 
-  const progressPct = questions.length > 0
-    ? Math.round((currentIndex / questions.length) * 100)
-    : 0
+  const progressPct =
+    questions.length > 0
+      ? Math.round((currentIndex / questions.length) * 100)
+      : 0;
 
   return (
     <div className="space-y-5 py-2">
       {/* Header */}
       <div className="space-y-2">
         <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
-          <span>QUESTION {currentIndex + 1} OF {questions.length}</span>
+          <span>
+            QUESTION {currentIndex + 1} OF {questions.length}
+          </span>
           <span>{progressPct}%</span>
         </div>
         <Progress value={progressPct} className="h-1.5 [&>div]:bg-primary" />
@@ -466,14 +498,23 @@ export function KnowledgeCheck({
 
       {/* Revealed correct/wrong banner for fill blank */}
       {isRevealed && currentQ.type === "fill_blank" && fillCorrect !== null && (
-        <p className={cn(
-          "flex items-center gap-1.5 text-sm font-medium",
-          fillCorrect ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400",
-        )}>
-          {fillCorrect
-            ? <><CheckCircle2 className="h-4 w-4" /> Correct!</>
-            : <><XCircle className="h-4 w-4" /> Incorrect</>
-          }
+        <p
+          className={cn(
+            "flex items-center gap-1.5 text-sm font-medium",
+            fillCorrect
+              ? "text-green-600 dark:text-green-400"
+              : "text-red-600 dark:text-red-400",
+          )}
+        >
+          {fillCorrect ? (
+            <>
+              <CheckCircle2 className="h-4 w-4" /> Correct!
+            </>
+          ) : (
+            <>
+              <XCircle className="h-4 w-4" /> Incorrect
+            </>
+          )}
         </p>
       )}
 
@@ -498,5 +539,5 @@ export function KnowledgeCheck({
         )}
       </div>
     </div>
-  )
+  );
 }

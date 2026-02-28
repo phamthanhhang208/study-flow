@@ -1,17 +1,17 @@
-import { useEffect, useRef } from "react"
-import { Clock, Circle, CheckCircle2, Trophy } from "lucide-react"
-import { cn } from "../../lib/utils/cn"
-import { Progress } from "../ui/progress"
-import type { LearningPath } from "../../lib/api/types"
-import type { QuizAttempt } from "../../lib/store/studyStore"
+import { useEffect, useRef } from "react";
+import { Clock, Circle, CheckCircle2, Trophy } from "lucide-react";
+import { cn } from "../../lib/utils/cn";
+import { Progress } from "../ui/progress";
+import type { LearningPath } from "../../lib/api/types";
+import type { QuizAttempt } from "../../lib/store/studyStore";
 
 interface ModuleNavHorizontalProps {
-  path: LearningPath
-  activeModuleId: string
-  completedModuleIds: Set<string>
-  quizAttempts?: Record<string, QuizAttempt[]>
-  onSelect: (id: string) => void
-  onToggleComplete: (moduleId: string) => void
+  path: LearningPath;
+  activeModuleId: string;
+  completedModuleIds: Set<string>;
+  quizAttempts?: Record<string, QuizAttempt[]>;
+  onSelect: (id: string) => void;
+  onToggleComplete: (moduleId: string) => void;
 }
 
 export function ModuleNavHorizontal({
@@ -22,31 +22,44 @@ export function ModuleNavHorizontal({
   onSelect,
   onToggleComplete,
 }: ModuleNavHorizontalProps) {
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const activeRef = useRef<HTMLButtonElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const activeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (activeRef.current && scrollRef.current) {
-      const container = scrollRef.current
-      const card = activeRef.current
-      const containerRect = container.getBoundingClientRect()
-      const cardRect = card.getBoundingClientRect()
+      const container = scrollRef.current;
+      const card = activeRef.current;
+      const containerRect = container.getBoundingClientRect();
+      const cardRect = card.getBoundingClientRect();
 
-      if (cardRect.left < containerRect.left || cardRect.right > containerRect.right) {
-        card.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" })
+      if (
+        cardRect.left < containerRect.left ||
+        cardRect.right > containerRect.right
+      ) {
+        card.scrollIntoView({
+          behavior: "smooth",
+          inline: "center",
+          block: "nearest",
+        });
       }
     }
-  }, [activeModuleId])
+  }, [activeModuleId]);
 
-  const totalModules = path.subModules.length
-  const completedCount = path.subModules.filter((m) => completedModuleIds.has(m.id)).length
-  const progressPercent = totalModules > 0 ? Math.round((completedCount / totalModules) * 100) : 0
+  const totalModules = path.subModules.length;
+  const completedCount = path.subModules.filter((m) =>
+    completedModuleIds.has(m.id),
+  ).length;
+  const progressPercent =
+    totalModules > 0 ? Math.round((completedCount / totalModules) * 100) : 0;
 
   return (
     <div className="space-y-3">
       {/* Progress bar */}
       <div className="flex items-center gap-3">
-        <Progress value={progressPercent} className="flex-1 [&>div]:bg-green-500" />
+        <Progress
+          value={progressPercent}
+          className="flex-1 [&>div]:bg-green-500"
+        />
         <span className="shrink-0 text-xs text-muted-foreground">
           {completedCount} / {totalModules} modules completed
         </span>
@@ -60,11 +73,12 @@ export function ModuleNavHorizontal({
         aria-label="Learning modules"
       >
         {path.subModules.map((mod) => {
-          const isActive = mod.id === activeModuleId
-          const isComplete = completedModuleIds.has(mod.id)
-          const attempts = quizAttempts[mod.id] ?? []
-          const bestAttempt = attempts[0]
-          const quizPassed = bestAttempt && bestAttempt.score / bestAttempt.total >= 0.8
+          const isActive = mod.id === activeModuleId;
+          const isComplete = completedModuleIds.has(mod.id);
+          const attempts = quizAttempts[mod.id] ?? [];
+          const bestAttempt = attempts[0];
+          const quizPassed =
+            bestAttempt && bestAttempt.score / bestAttempt.total >= 0.8;
           return (
             <button
               key={mod.id}
@@ -77,8 +91,8 @@ export function ModuleNavHorizontal({
                 isActive
                   ? "border-blue-500 bg-blue-50/50 dark:bg-blue-950/20"
                   : isComplete
-                  ? "border-green-500/50 bg-green-50/40 hover:border-green-500/80 dark:bg-green-950/10"
-                  : "border-border hover:border-blue-300 hover:bg-accent/50",
+                    ? "border-green-500/50 bg-green-50/40 hover:border-green-500/80 dark:bg-green-950/10"
+                    : "border-border hover:border-blue-300 hover:bg-accent/50",
               )}
             >
               {/* Top row: module label + trophy + time */}
@@ -89,28 +103,29 @@ export function ModuleNavHorizontal({
                     isActive
                       ? "text-blue-500"
                       : isComplete
-                      ? "text-green-600 dark:text-green-400"
-                      : "text-muted-foreground",
+                        ? "text-green-600 dark:text-green-400"
+                        : "text-muted-foreground",
                   )}
                 >
                   Module {mod.order}
                 </span>
                 <div className="flex shrink-0 items-center gap-1">
                   {quizPassed && (
-                    <Trophy
-                      className="h-3.5 w-3.5 text-yellow-500"
+                    <div
                       title={`Quiz passed: ${bestAttempt.score}/${bestAttempt.total}`}
-                    />
+                    >
+                      <Trophy className="h-3.5 w-3.5 text-yellow-500" />
+                    </div>
                   )}
-                <span
-                  className={cn(
-                    "flex shrink-0 items-center gap-1 text-xs",
-                    isActive ? "text-blue-500/80" : "text-muted-foreground",
-                  )}
-                >
-                  <Clock className="h-3 w-3" />
-                  {mod.estimatedMinutes} min
-                </span>
+                  <span
+                    className={cn(
+                      "flex shrink-0 items-center gap-1 text-xs",
+                      isActive ? "text-blue-500/80" : "text-muted-foreground",
+                    )}
+                  >
+                    <Clock className="h-3 w-3" />
+                    {mod.estimatedMinutes} min
+                  </span>
                 </div>
               </div>
 
@@ -121,8 +136,8 @@ export function ModuleNavHorizontal({
                   isActive
                     ? "text-blue-600 dark:text-blue-400"
                     : isComplete
-                    ? "text-green-700 dark:text-green-300"
-                    : "text-foreground",
+                      ? "text-green-700 dark:text-green-300"
+                      : "text-foreground",
                 )}
               >
                 {mod.title}
@@ -138,8 +153,8 @@ export function ModuleNavHorizontal({
                 type="button"
                 aria-label={isComplete ? "Mark incomplete" : "Mark complete"}
                 onClick={(e) => {
-                  e.stopPropagation()
-                  onToggleComplete(mod.id)
+                  e.stopPropagation();
+                  onToggleComplete(mod.id);
                 }}
                 className={cn(
                   "mt-3 flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors",
@@ -156,9 +171,9 @@ export function ModuleNavHorizontal({
                 {isComplete ? "Completed" : "Mark complete"}
               </button>
             </button>
-          )
+          );
         })}
       </div>
     </div>
-  )
+  );
 }
