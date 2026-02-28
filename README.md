@@ -8,10 +8,11 @@ An AI-powered learning companion that generates structured learning paths from a
 
 - **AI Learning Paths** — Enter any topic and get a structured curriculum with modules, estimated time, and difficulty rating
 - **Curated Resources** — Each module is automatically populated with relevant articles and videos
+- **Knowledge Check** — AI-generated quizzes (multiple choice, true/false, fill-in-the-blank) with instant feedback, explanations, and score tracking. Quiz results are cached per module so they load instantly on repeat visits. Trophy badge on module cards for scores ≥ 80%
 - **Study Assistant** — Context-aware AI tutor for each module with per-module conversation threads and suggested follow-ups
 - **Progress Tracking** — Mark modules complete with a visual progress bar
 - **Shareable Paths** — Share any learning path via a public link; others can clone it to their own account
-- **Google Auth + Cloud Sync** — Sign in with Google; all paths and progress are saved to Supabase
+- **Google Auth + Cloud Sync** — Sign in with Google; all paths, progress, and quiz attempts are saved to Supabase
 - **Source Viewer** — Read articles and watch videos in-app with full-screen modals
 - **Export** — Download sessions as Markdown files
 - **Dark Mode** — Light, dark, and system theme support
@@ -71,7 +72,7 @@ npm run build
 
 ## Database Setup
 
-Run the following SQL in your Supabase SQL editor.
+Run the following SQL in your Supabase SQL editor (in order).
 
 <details>
 <summary><strong>learning_paths</strong></summary>
@@ -180,6 +181,51 @@ create policy "Owner manages shared paths"
 ```
 </details>
 
+<details>
+<summary><strong>module_quizzes</strong></summary>
+
+```sql
+-- Cached quiz questions per module, shared across all users
+create table module_quizzes (
+  id uuid default gen_random_uuid() primary key,
+  module_id uuid references modules(id) on delete cascade,
+  questions jsonb not null,
+  created_at timestamptz default now(),
+  unique(module_id)
+);
+
+alter table module_quizzes enable row level security;
+
+create policy "Anyone can read quizzes"
+  on module_quizzes for select using (true);
+
+create policy "Service role can manage quizzes"
+  on module_quizzes for all using (true);
+```
+</details>
+
+<details>
+<summary><strong>quiz_attempts</strong></summary>
+
+```sql
+-- Each user's quiz attempts and scores per module
+create table quiz_attempts (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users(id) on delete cascade,
+  module_id uuid references modules(id) on delete cascade,
+  score integer not null,
+  total integer not null,
+  answers jsonb not null,
+  completed_at timestamptz default now()
+);
+
+alter table quiz_attempts enable row level security;
+
+create policy "Users own their attempts"
+  on quiz_attempts for all using (auth.uid() = user_id);
+```
+</details>
+
 ### Google OAuth
 
 1. In Supabase → Authentication → Providers, enable **Google**
@@ -193,8 +239,8 @@ src/
 ├── components/
 │   ├── auth/           # LoginPage (Google OAuth gate)
 │   ├── layout/         # Header, Sidebar, InputBar, WelcomeScreen
-│   ├── learning/       # ModuleNavHorizontal, ContentTabs, StudyAssistant,
-│   │                   # OrchestrationProgress
+│   ├── learning/       # ModuleNavHorizontal, ContentTabs, KnowledgeCheck,
+│   │                   # StudyAssistant, OrchestrationProgress
 │   ├── modals/         # SourceReaderModal, VideoPlayerModal, KeyboardShortcutsModal
 │   ├── ui/             # shadcn/ui primitives
 │   ├── ErrorBoundary.tsx
@@ -206,7 +252,7 @@ src/
 │   ├── useAgentOrchestration.ts  # Topic + question orchestration
 │   └── useKeyboardShortcuts.ts
 ├── lib/
-│   ├── api/            # Claude agents (moduleGenerator, tutorAgent, types)
+│   ├── api/            # Claude agents (moduleGenerator, tutorAgent, quizGenerator, types)
 │   ├── db/             # Supabase data layer (learningPaths, moduleProgress, sharedPaths)
 │   ├── store/          # Zustand stores (studyStore, settingsStore)
 │   └── utils/
